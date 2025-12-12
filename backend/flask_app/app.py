@@ -53,7 +53,7 @@ def preprocess_comment(comment):
 # Load the model and vectorizer from the model registry and local storage
 def load_model_and_vectorizer(model_name, model_version, vectorizer_path):
     # Set MLflow tracking URI to your server
-    mlflow.set_tracking_uri("http://ec2-54-196-109-131.compute-1.amazonaws.com:5000/")  # Replace with your MLflow tracking URI
+    mlflow.set_tracking_uri("http://ec2-34-207-111-233.compute-1.amazonaws.com:5000/")  # Replace with your MLflow tracking URI
     client = MlflowClient()
     model_uri = f"models:/{model_name}/{model_version}"
     model = mlflow.pyfunc.load_model(model_uri)
@@ -61,7 +61,7 @@ def load_model_and_vectorizer(model_name, model_version, vectorizer_path):
     return model, vectorizer
 
 # Initialize the model and vectorizer
-model, vectorizer = load_model_and_vectorizer("my_model", "1", "./tfidf_vectorizer.pkl")  # Update paths and versions as needed
+model, vectorizer = load_model_and_vectorizer("yt_chrome_plugin_model", "2", "models/tfidf_vectorizer.pkl")  # Update paths and versions as needed
 
 @app.route('/')
 def home():
@@ -83,13 +83,25 @@ def predict_with_timestamps():
         preprocessed_comments = [preprocess_comment(comment) for comment in comments]
         
         # Transform comments using the vectorizer
-        transformed_comments = vectorizer.transform(preprocessed_comments)
+        #transformed_comments = vectorizer.transform(preprocessed_comments)
         
         # Make predictions
-        predictions = model.predict(transformed_comments).tolist()  # Convert to list
-        
+        #predictions = model.predict(transformed_comments).tolist()  # Convert to list
+
         # Convert predictions to strings for consistency
-        predictions = [str(pred) for pred in predictions]
+        #predictions = [str(pred) for pred in predictions]
+
+        # Transform comments using vectorizer
+        X_sparse = vectorizer.transform(preprocessed_comments)
+
+        # Convert sparse matrix to DataFrame
+        feature_names = vectorizer.get_feature_names_out()
+        X_df = pd.DataFrame(X_sparse.toarray(), columns=feature_names)
+
+        # Predict using MLflow model
+        predictions = model.predict(X_df).tolist()
+        predictions = [str(p) for p in predictions]
+
     except Exception as e:
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
     
@@ -110,13 +122,25 @@ def predict():
         preprocessed_comments = [preprocess_comment(comment) for comment in comments]
         
         # Transform comments using the vectorizer
-        transformed_comments = vectorizer.transform(preprocessed_comments)
+        #transformed_comments = vectorizer.transform(preprocessed_comments)
         
         # Make predictions
-        predictions = model.predict(transformed_comments).tolist()  # Convert to list
+        #predictions = model.predict(transformed_comments).tolist()  # Convert to list
         
         # Convert predictions to strings for consistency
-        predictions = [str(pred) for pred in predictions]
+        #predictions = [str(pred) for pred in predictions]
+
+        # Transform comments using vectorizer
+        X_sparse = vectorizer.transform(preprocessed_comments)
+
+        # Convert sparse matrix to DataFrame
+        feature_names = vectorizer.get_feature_names_out()
+        X_df = pd.DataFrame(X_sparse.toarray(), columns=feature_names)
+
+        # Predict using MLflow model
+        predictions = model.predict(X_df).tolist()
+        predictions = [str(p) for p in predictions]
+
     except Exception as e:
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
     
