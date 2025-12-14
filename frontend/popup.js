@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", async () => {
   // ===== CONFIG (same as your working version) =====
-  const API_KEY = 'AIzaSyDBLon6pULtFwGsIoe8rqnTmhxBUp-NM88';
+  const API_KEY = '####';
   const API_URL = 'http://localhost:5000';
 
   // ===== UI =====
