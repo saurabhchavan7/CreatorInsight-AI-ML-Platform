@@ -1,80 +1,586 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>YouTube Comment Analyzer</title>
+  <meta charset="UTF-8" />
+  <title>CreatorInsight AI</title>
+
   <style>
-    /* Dark Theme */
+    :root {
+      --bg: #f7f8fc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: rgba(15, 23, 42, 0.10);
+      --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+
+      --accent: #4f46e5;
+      --accentSoft: rgba(79, 70, 229, 0.12);
+
+      --pos: #16a34a;
+      --neu: #94a3b8;
+      --neg: #dc2626;
+
+      --btnBg: #ffffff;
+      --btnHover: #f1f5f9;
+    }
+
+    body.dark {
+      --bg: #050816;
+      --card: #0b1223;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.10);
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+
+      --accent: #818cf8;
+      --accentSoft: rgba(129, 140, 248, 0.16);
+
+      --btnBg: #0f172a;
+      --btnHover: #111c35;
+    }
+
+    * { box-sizing: border-box; }
+
     body {
-      font-family: Arial, sans-serif;
-      padding: 10px;
-      background-color: #1e1e1e;
-      color: #f1f1f1;
       margin: 0;
-      box-sizing: border-box;
-      width: 320px; /* Set a width that fits the Chrome extension popup */
+      width: 385px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
     }
-    h1 {
-      font-size: 20px;
-      color: #ffffff;
+
+    .wrap { padding: 14px; }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 10px;
     }
-    .section {
-      margin-bottom: 15px;
+
+    .brand { line-height: 1.15; }
+    .brand .title {
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.2px;
     }
-    .section-title {
-      font-weight: bold;
-      color: #0099ff;
+    .brand .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .themeToggle {
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--text);
+      padding: 7px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 120ms ease;
+      user-select: none;
+    }
+    .themeToggle:hover { background: var(--btnHover); }
+
+    .pill {
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accentSoft);
+      color: var(--accent);
+      border: 1px solid rgba(79,70,229,0.22);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .sectionTitle {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .btnRow {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 120ms ease, transform 120ms ease;
+    }
+    button:hover { background: var(--btnHover); }
+    button:active { transform: translateY(1px); }
+
+    .btnPrimary {
+      border: none;
+      background: var(--accent);
+      color: white;
+    }
+
+    .status {
+      display: flex;
+      gap: 8px;
+      align-items: center;
       margin-top: 10px;
-      font-size: 16px;
+      font-size: 12px;
+      color: var(--muted);
     }
-    .comment-list {
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(100, 116, 139, 0.8);
+    }
+    .dot.ok { background: rgba(34, 197, 94, 0.95); }
+    .dot.warn { background: rgba(239, 68, 68, 0.95); }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 9px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tab.active {
+      color: var(--accent);
+      border-color: rgba(79,70,229,0.28);
+      background: var(--accentSoft);
+    }
+
+    .tabContent { display: none; }
+    .tabContent.active { display: block; }
+
+    /* Metrics */
+    .metaLine {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .metric {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .metric .label {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+    .metric .value {
+      font-size: 18px;
+      font-weight: 950;
+      margin-top: 6px;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(15, 23, 42, 0.08);
+      margin: 12px 0;
+    }
+    body.dark .divider { background: rgba(255,255,255,0.10); }
+
+    /* Graph cards */
+    .graphGrid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .graphCard {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .graphHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .graphTitle {
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .graphHint {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .graphBody img {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      cursor: pointer;
+      display: block;
+      background: #fff;
+    }
+    body.dark .graphBody img { border-color: rgba(255,255,255,0.12); background: #0b1223; }
+
+    /* Insights placeholder table */
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+    .table th, .table td {
+      padding: 10px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .table th {
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+      background: rgba(15,23,42,0.03);
+      font-weight: 900;
+    }
+    body.dark .table th { background: rgba(255,255,255,0.06); }
+    .table tr:last-child td { border-bottom: none; }
+
+    .emptyNote {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.45;
+      margin-top: 10px;
+    }
+
+    /* Comments filters */
+    .segmented {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .segmented button {
+      flex: 1;
+      border: none;
+      border-right: 1px solid var(--border);
+      border-radius: 0;
+      padding: 8px 10px;
+      background: transparent;
+      font-weight: 900;
+      color: var(--muted);
+    }
+    .segmented button:last-child { border-right: none; }
+    .segmented button.active {
+      background: var(--accentSoft);
+      color: var(--accent);
+    }
+
+    .commentList {
       list-style: none;
       padding: 0;
+      margin: 0;
+      max-height: 260px;
+      overflow: auto;
     }
-    .comment-item {
-      margin: 8px 0;
-      padding: 8px;
-      background-color: #444;
-      border-radius: 4px;
-    }
-    .comment-sentiment {
-      font-weight: bold;
-      color: #ffffff;
-    }
-    /* Image Styling */
-    img {
-      width: 100%;
-      margin-top: 20px;
-    }
-    /* Metrics Styling */
-    .metrics-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-    }
-    .metric {
-      width: 48%;
-      background-color: #444;
-      margin-bottom: 10px;
+
+    .commentItem {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 12px;
       padding: 10px;
-      border-radius: 4px;
-      text-align: center;
-      box-sizing: border-box;
+      margin-bottom: 8px;
+      background: rgba(255,255,255,0.03);
     }
-    .metric-title {
+    body.dark .commentItem { border-color: rgba(255,255,255,0.10); }
+
+    .commentMeta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .badge {
+      font-size: 11px;
+      font-weight: 950;
+      padding: 5px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(15,23,42,0.10);
+      background: rgba(15,23,42,0.04);
+    }
+    body.dark .badge { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); }
+
+    .badge.pos { color: var(--pos); }
+    .badge.neu { color: var(--neu); }
+    .badge.neg { color: var(--neg); }
+
+    .commentText {
       font-size: 12px;
-      color: #cccccc;
+      line-height: 1.35;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
     }
-    .metric-value {
-      font-size: 22px;
-      font-weight: bold;
-      color: #ffffff;
-      margin-top: 5px;
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.65);
+      z-index: 9999;
+      padding: 14px;
     }
+    .modal.open { display: flex; }
+
+    .modalCard {
+      width: 100%;
+      max-width: 900px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 10px;
+    }
+
+    .modalTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 6px 10px 6px;
+      gap: 10px;
+    }
+    .modalTitle {
+      font-size: 12px;
+      font-weight: 950;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .modalClose {
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      padding: 6px 10px;
+      border-radius: 10px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .modalImg {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(15,23,42,0.08);
+      background: #fff;
+      display: block;
+    }
+    body.dark .modalImg { border-color: rgba(255,255,255,0.12); background: #0b1223; }
   </style>
 </head>
+
 <body>
-  <h1>YouTube Comment Analyzer</h1>
-  <div id="output" class="section"></div>
+  <div class="wrap">
+    <div class="header">
+      <div class="brand">
+        <div class="title">CreatorInsight AI</div>
+        <div class="subtitle">YouTube Comment Intelligence</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div class="pill" id="pageStatus">Ready</div>
+        <div class="themeToggle" id="themeToggle">Dark mode</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sectionTitle">Controls</div>
+      <div class="btnRow">
+        <button class="btnPrimary" id="btnAnalyze">Analyze this video</button>
+        <button id="btnExportHTML">Export Report (HTML)</button>
+      </div>
+      <div class="status">
+        <div class="dot" id="statusDot"></div>
+        <div id="statusText">Open a YouTube video page and click “Analyze”.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active" data-tab="tabMetrics">Metrics</div>
+        <div class="tab" data-tab="tabInsights">Insights</div>
+        <div class="tab" data-tab="tabComments">Comments</div>
+      </div>
+
+      <!-- METRICS TAB -->
+      <div class="tabContent active" id="tabMetrics">
+        <div class="metaLine" id="videoMeta">No video detected yet.</div>
+
+        <div class="grid">
+          <div class="metric">
+            <div class="label">Total Comments</div>
+            <div class="value" id="mTotal">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Unique Commenters</div>
+            <div class="value" id="mUnique">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Avg Comment Length</div>
+            <div class="value" id="mAvgLen">—</div>
+          </div>
+          <div class="metric">
+            <div class="label">Avg Sentiment</div>
+            <div class="value" id="mSent">—</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="graphGrid">
+          <div class="graphCard">
+            <div class="graphHeader">
+              <div class="graphTitle">Sentiment Distribution</div>
+              <div class="graphHint">Click to expand</div>
+            </div>
+            <div class="graphBody" id="chart-container"></div>
+          </div>
+
+          <div class="graphCard">
+            <div class="graphHeader">
+              <div class="graphTitle">Sentiment Trend</div>
+              <div class="graphHint">Click to expand</div>
+            </div>
+            <div class="graphBody" id="trend-graph-container"></div>
+          </div>
+
+          <div class="graphCard">
+            <div class="graphHeader">
+              <div class="graphTitle">Top Themes</div>
+              <div class="graphHint">Click to expand</div>
+            </div>
+            <div class="graphBody" id="wordcloud-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- INSIGHTS TAB -->
+      <div class="tabContent" id="tabInsights">
+        <div class="sectionTitle">AI Comment Summarization</div>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width: 34%;">Section</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Key Themes</b></td>
+              <td>— (Coming soon)</td>
+            </tr>
+            <tr>
+              <td><b>What Audience Loved</b></td>
+              <td>— (Coming soon)</td>
+            </tr>
+            <tr>
+              <td><b>Risks / Concerns</b></td>
+              <td>— (Coming soon)</td>
+            </tr>
+            <tr>
+              <td><b>Actionable Suggestions</b></td>
+              <td>— (Coming soon)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="emptyNote">
+          This section will generate an AI summary of comments and provide creator-friendly takeaways.
+          (You’ll tell me next what logic to plug in — we’ll keep the UI ready.)
+        </div>
+      </div>
+
+      <!-- COMMENTS TAB -->
+      <div class="tabContent" id="tabComments">
+        <div class="sectionTitle">Comment Explorer</div>
+
+        <div class="segmented" id="sentimentTabs">
+          <button data-filter="all" class="active">All (<span id="cAll">0</span>)</button>
+          <button data-filter="1">Positive (<span id="cPos">0</span>)</button>
+          <button data-filter="0">Neutral (<span id="cNeu">0</span>)</button>
+          <button data-filter="-1">Negative (<span id="cNeg">0</span>)</button>
+        </div>
+
+        <ul class="commentList" id="commentList"></ul>
+        <div class="emptyNote" id="commentFooterNote"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL FOR EXPANDED GRAPHS -->
+  <div class="modal" id="imgModal">
+    <div class="modalCard">
+      <div class="modalTop">
+        <div class="modalTitle" id="modalTitle">Preview</div>
+        <button class="modalClose" id="modalClose">Close</button>
+      </div>
+      <img class="modalImg" id="modalImg" src="" alt="Expanded graph" />
+    </div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
