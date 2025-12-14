@@ -71,6 +71,64 @@
       margin-top: 3px;
     }
 
+    /* ===== THEME SWITCH (Light / Dark Toggle) ===== */
+
+    .themeSwitch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .themeSwitch .icon {
+      font-size: 13px;
+      line-height: 1;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 22px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #cbd5f5;
+      border-radius: 999px;
+      transition: background-color 0.25s ease;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      height: 18px;
+      width: 18px;
+      left: 2px;
+      top: 2px;
+      background-color: white;
+      border-radius: 50%;
+      transition: transform 0.25s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+
+    /* checked = dark mode */
+    .switch input:checked + .slider {
+      background-color: var(--accent);
+    }
+
+    .switch input:checked + .slider::before {
+      transform: translateX(20px);
+    }
+
+
     .themeToggle {
       font-size: 11px;
       font-weight: 800;
@@ -441,7 +499,14 @@
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
         <div class="pill" id="pageStatus">Ready</div>
-        <div class="themeToggle" id="themeToggle">Dark mode</div>
+        <div class="themeSwitch">
+        <span class="icon">☀️</span>
+        <label class="switch">
+          <input type="checkbox" id="themeToggle">
+          <span class="slider"></span>
+        </label>
+        <span class="icon">🌙</span>
+        </div>
       </div>
     </div>
 

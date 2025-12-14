@@ -159,11 +159,31 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // ===== THEME TOGGLE =====
-  themeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark");
-    themeToggle.textContent = document.body.classList.contains("dark") ? "Light mode" : "Dark mode";
+  // // ===== THEME TOGGLE =====
+  // themeToggle.addEventListener("click", () => {
+  //   document.body.classList.toggle("dark");
+  //   themeToggle.textContent = document.body.classList.contains("dark") ? "Light mode" : "Dark mode";
+  // });
+
+
+// Load saved theme
+  const savedTheme = localStorage.getItem("creatorinsight-theme");
+    if (savedTheme === "dark") {
+      document.body.classList.add("dark");
+      themeToggle.checked = true;
+    }
+
+  // Toggle theme
+  themeToggle.addEventListener("change", () => {
+    if (themeToggle.checked) {
+      document.body.classList.add("dark");
+      localStorage.setItem("creatorinsight-theme", "dark");
+    } else {
+      document.body.classList.remove("dark");
+      localStorage.setItem("creatorinsight-theme", "light");
+    }
   });
+
 
   // ===== TABS =====
   tabButtons.forEach(btn => {
@@ -341,9 +361,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const payload = buildExportPayload();
     const html = buildHtmlReport(payload);
-    const name = safeFilename(`creatorinsight_${currentVideoId}_${activeFilter}_report.html`);
-    downloadTextFile(name, html, "text/html");
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+
+    // Open in new browser tab
+    chrome.tabs.create({ url });
+
+    // Cleanup later
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   });
+
 
   function buildExportPayload() {
     const totalComments = rawComments.length;
