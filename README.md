@@ -1,4 +1,4 @@
-# CreatorInsight AI  
+# CreatorInsight AI/ML Platform  
 ## End-to-End ML & AI System for YouTube Comment Intelligence
 
 CreatorInsight AI is a production-grade machine learning and AI platform that analyzes YouTube video comments to extract sentiment, audience themes, risks, and actionable insights at scale.
