@@ -1,0 +1,2 @@
+2025-12-03 02:54:30,244 - model_registration - ERROR - Error during model registration: Unable to find a logged_model with artifact_path s3://sau-s3-mlflow-bucket/460054897548370293/5d7a2b6a1a784d48a5f4d29588be687a/artifacts/lgbm_model under run 5d7a2b6a1a784d48a5f4d29588be687a
+2025-12-03 02:54:30,244 - model_registration - ERROR - Failed to complete the model registration process: Unable to find a logged_model with artifact_path s3://sau-s3-mlflow-bucket/460054897548370293/5d7a2b6a1a784d48a5f4d29588be687a/artifacts/lgbm_model under run 5d7a2b6a1a784d48a5f4d29588be687a
