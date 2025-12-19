@@ -46,8 +46,8 @@ stages:
       size: 3886282
     - path: src/model/model_building.py
       hash: md5
-      md5: 6c27a5d35e174d31a91245bcad88f702
-      size: 5678
+      md5: 68bba38bfa619d38426ed4fade1609b3
+      size: 9335
     params:
       params.yaml:
         model_building.learning_rate: 0.09
@@ -58,14 +58,10 @@ stages:
         - 1
         - 3
     outs:
-    - path: models/lgbm_model.pkl
+    - path: models/sentiment_pipeline.pkl
       hash: md5
-      md5: d44073c98d55723002e40a0cceb2efc5
-      size: 4104974
-    - path: models/tfidf_vectorizer.pkl
-      hash: md5
-      md5: 26c6d8a39648bc102b99f660eeb7c6ce
-      size: 344012
+      md5: a43cc19d1db8d2a5aaf58679f951d60e
+      size: 4449091
   model_evaluation:
     cmd: python src/model/model_evaluation.py
     deps:
@@ -77,31 +73,27 @@ stages:
       hash: md5
       md5: b5a818f46d32f38de3b86a761aa39e1e
       size: 3886282
-    - path: models/lgbm_model.pkl
+    - path: models/sentiment_pipeline.pkl
       hash: md5
-      md5: d44073c98d55723002e40a0cceb2efc5
-      size: 4104974
-    - path: models/tfidf_vectorizer.pkl
-      hash: md5
-      md5: 26c6d8a39648bc102b99f660eeb7c6ce
-      size: 344012
+      md5: a43cc19d1db8d2a5aaf58679f951d60e
+      size: 4449091
     - path: src/model/model_evaluation.py
       hash: md5
-      md5: 4eb6d40b30199cc9de1f91011c409f54
-      size: 7952
+      md5: 146c6111eebb1d51b4472f5e0a583b87
+      size: 12919
     outs:
     - path: experiment_info.json
       hash: md5
-      md5: b2eca651a5ac86a7f3f883d9a0614a6e
-      size: 87
+      md5: 8aa47486e12350ab69ac44a55d5b4808
+      size: 95
   model_registration:
     cmd: python src/model/register_model.py
     deps:
     - path: experiment_info.json
       hash: md5
-      md5: b2eca651a5ac86a7f3f883d9a0614a6e
-      size: 87
+      md5: 8aa47486e12350ab69ac44a55d5b4808
+      size: 95
     - path: src/model/register_model.py
       hash: md5
-      md5: a692a0897baa6a3c7ec8f292a1de6852
-      size: 2467
+      md5: 45df81d0a2d520e4c1bc211e0f7ea8ae
+      size: 2479
