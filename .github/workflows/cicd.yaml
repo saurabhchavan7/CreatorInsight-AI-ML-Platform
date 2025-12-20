@@ -106,7 +106,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          nohup python app.py > flask.log 2>&1 &
+          nohup python backend/flask_app/app.py > flask.log 2>&1 &
           echo "Waiting for Flask to start..."
           for i in {1..30}; do
             curl -s http://127.0.0.1:5000/ && break
