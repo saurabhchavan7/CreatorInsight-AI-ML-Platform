@@ -13,6 +13,7 @@ import numpy as np
 import re
 import pandas as pd
 import matplotlib.dates as mdates
+import os
 
 # NLTK imports (safe-guarded usage below)
 from nltk.corpus import stopwords
@@ -26,7 +27,10 @@ CORS(app)  # Enable CORS for all routes
 # -----------------------------
 # Configuration
 # -----------------------------
-MLFLOW_TRACKING_URI = "http://ec2-54-172-186-220.compute-1.amazonaws.com:5000/"
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
+
+if not MLFLOW_TRACKING_URI:
+    raise RuntimeError("MLFLOW_TRACKING_URI is not set")
 
 MODEL_NAME = "creatorinsight_sentiment_pipeline"
 MODEL_VERSION = "1"  # you can switch to "Production" later if you use stages
