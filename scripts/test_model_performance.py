@@ -5,7 +5,7 @@ import mlflow
 from mlflow.tracking import MlflowClient
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-mlflow.set_tracking_uri("http://ec2-54-172-186-220.compute-1.amazonaws.com:5000/")
+mlflow.set_tracking_uri("http://ec2-18-234-210-41.compute-1.amazonaws.com:5000/")
 
 @pytest.mark.parametrize(
     "model_name, stage, test_data_path",

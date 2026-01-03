@@ -2,7 +2,7 @@ import mlflow
 import random
 
 # Set the MLflow tracking URI
-mlflow.set_tracking_uri("http://ec2-54-243-15-48.compute-1.amazonaws.com:5000/")
+mlflow.set_tracking_uri("http://ec2-18-234-210-41.compute-1.amazonaws.com:5000/")
 
 # Start an MLflow run
 with mlflow.start_run():
