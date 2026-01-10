@@ -27,10 +27,22 @@ CORS(app)  # Enable CORS for all routes
 # -----------------------------
 # Configuration
 # -----------------------------
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
+try:
+    from config import MLFLOW_TRACKING_URI as CONFIG_MLFLOW_URI
+except ImportError:
+    CONFIG_MLFLOW_URI = None
+
+MLFLOW_TRACKING_URI = (
+    os.getenv("MLFLOW_TRACKING_URI")
+    or CONFIG_MLFLOW_URI
+)
 
 if not MLFLOW_TRACKING_URI:
     raise RuntimeError("MLFLOW_TRACKING_URI is not set")
+
+# mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+# print(f"[INFO] Using MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
 
 MODEL_NAME = "creatorinsight_sentiment_pipeline"
 MODEL_VERSION = "1"  # you can switch to "Production" later if you use stages
