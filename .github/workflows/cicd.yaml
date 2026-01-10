@@ -107,7 +107,15 @@ jobs:
           AWS_DEFAULT_REGION: us-east-1
         run: |
           nohup python backend/flask_app/app.py &
+          sleep 10
 
+      - name: Wait for Flask to be ready
+        run: |
+          for i in {1..10}; do
+            curl -f http://localhost:5000/ && break
+            sleep 2
+          done
+  
       - name: Run Flask API tests
         run: |
           pytest scripts/test_flask_api.py
