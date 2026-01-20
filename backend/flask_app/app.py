@@ -3,6 +3,8 @@
 import matplotlib
 matplotlib.use("Agg")  # Use non-interactive backend before importing pyplot
 
+import json
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import io
@@ -18,6 +20,34 @@ import os
 # NLTK imports (safe-guarded usage below)
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
+
+# AI summarization imports
+# OpenAI Configuration
+# -----------------------------
+# OpenAI Configuration (matches MLflow pattern)
+# -----------------------------
+from openai import OpenAI
+import os
+
+try:
+    from config import OPENAI_API_KEY as CONFIG_OPENAI_KEY
+except ImportError:
+    CONFIG_OPENAI_KEY = None
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or CONFIG_OPENAI_KEY
+
+# Simple initialization - no extra arguments
+openai_client = None
+if OPENAI_API_KEY:
+    try:
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+        print("[INFO] OpenAI client initialized")
+    except Exception as e:
+        print(f"[ERROR] OpenAI failed: {e}")
+        openai_client = None
+else:
+    print("[WARNING] OPENAI_API_KEY not set")
+
 
 
 app = Flask(__name__)
@@ -120,9 +150,127 @@ def ensure_pipeline_loaded():
     return True, None, None
 
 
+
+# -----------------------------
+# AI Summary Generation
+# -----------------------------
+
+
+def generate_ai_summary(comments, sentiments):
+    """
+    Generate AI summary using OpenAI GPT-4o-mini
+    
+    Args:
+        comments: List of comment texts (max 500)
+        sentiments: List of predictions (-1, 0, 1)
+    
+    Returns:
+        dict with key_themes, audience_loved, risks_concerns, suggestions
+    """
+    if not openai_client:
+        return {
+            "error": "OpenAI API not configured",
+            "key_themes": "API key missing",
+            "what_audience_loved": "Configure OPENAI_API_KEY",
+            "risks_concerns": "N/A",
+            "actionable_suggestions": "Set up OpenAI API key"
+        }
+    
+    try:
+        # Group comments by sentiment
+        positive_comments = [comments[i] for i in range(len(comments)) if str(sentiments[i]) == '1']
+        negative_comments = [comments[i] for i in range(len(comments)) if str(sentiments[i]) == '-1']
+        neutral_comments = [comments[i] for i in range(len(comments)) if str(sentiments[i]) == '0']
+        
+        # Limit to prevent token overflow (GPT-4o-mini has 128k context, but we'll be safe)
+        def sample_comments(comment_list, max_count=100):
+            """Take first and last comments to get variety"""
+            if len(comment_list) <= max_count:
+                return comment_list
+            half = max_count // 2
+            return comment_list[:half] + comment_list[-half:]
+        
+        pos_sample = sample_comments(positive_comments, 100)
+        neg_sample = sample_comments(negative_comments, 100)
+        neu_sample = sample_comments(neutral_comments, 50)
+        
+        # Calculate percentages for context
+        total = len(sentiments)
+        pos_pct = (len(positive_comments) / total * 100) if total > 0 else 0
+        neg_pct = (len(negative_comments) / total * 100) if total > 0 else 0
+        neu_pct = (len(neutral_comments) / total * 100) if total > 0 else 0
+        
+        # Build prompt
+        prompt = f"""You are analyzing YouTube comments for a content creator. Here's the data:
+
+**Statistics:**
+- Total comments: {total}
+- Positive: {len(positive_comments)} ({pos_pct:.1f}%)
+- Negative: {len(negative_comments)} ({neg_pct:.1f}%)
+- Neutral: {len(neutral_comments)} ({neu_pct:.1f}%)
+
+**Sample Positive Comments:**
+{chr(10).join(['- ' + c[:200] for c in pos_sample[:20]])}
+
+**Sample Negative Comments:**
+{chr(10).join(['- ' + c[:200] for c in neg_sample[:20]])}
+
+**Sample Neutral Comments:**
+{chr(10).join(['- ' + c[:200] for c in neu_sample[:10]])}
+
+Provide a concise creator-friendly analysis in this EXACT JSON format:
+{{
+  "key_themes": "2-3 sentence summary of main topics discussed",
+  "what_audience_loved": "What viewers appreciated (be specific, reference actual topics)",
+  "risks_concerns": "What viewers didn't like or complained about (be specific)",
+  "actionable_suggestions": "2-3 concrete actions the creator should take"
+}}
+
+Be specific and reference actual topics from comments. Keep each field under 150 words."""
+
+        # Call OpenAI API
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",  # Cheapest, fastest
+            messages=[
+                {"role": "system", "content": "You are a YouTube analytics expert helping creators improve their content."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=600,  # Keep response concise
+            response_format={"type": "json_object"}  # Force JSON output
+        )
+        
+        # Parse response
+        result = json.loads(response.choices[0].message.content)
+        
+        # Add metrics
+        result["metrics"] = {
+            "total_comments": total,
+            "positive_percentage": round(pos_pct, 1),
+            "neutral_percentage": round(neu_pct, 1),
+            "negative_percentage": round(neg_pct, 1),
+            "sentiment_score": round((sum([int(s) for s in sentiments]) / total + 1) * 5, 1)
+        }
+        
+        return result
+        
+    except Exception as e:
+        app.logger.error(f"OpenAI API error: {e}")
+        return {
+            "error": str(e),
+            "key_themes": f"Error: {str(e)}",
+            "what_audience_loved": "Analysis failed",
+            "risks_concerns": "Check logs",
+            "actionable_suggestions": "Retry analysis"
+        }
+    
+
+
+
 # -----------------------------
 # Routes
 # -----------------------------
+
 @app.route("/")
 def home():
     return "Welcome to our flask api"
@@ -335,6 +483,49 @@ def generate_trend_graph():
     except Exception as e:
         app.logger.error(f"Error in /generate_trend_graph: {e}")
         return jsonify({"error": f"Trend graph generation failed: {str(e)}"}), 500
+    
+@app.route("/generate_ai_summary", methods=["POST"])
+def generate_ai_summary_endpoint():
+    """
+    Generate AI-powered summary from comments
+    
+    Request body:
+    {
+      "comments": ["comment1", "comment2", ...],
+      "sentiments": ["1", "-1", "0", ...]  # Optional, will predict if not provided
+    }
+    """
+    ok, resp, code = ensure_pipeline_loaded()
+    if not ok:
+        return resp, code
+    
+    try:
+        data = request.get_json()
+        comments = data.get("comments", [])
+        sentiments = data.get("sentiments")
+        
+        if not comments:
+            return jsonify({"error": "No comments provided"}), 400
+        
+        # Limit to 500 comments
+        comments = comments[:500]
+        
+        # If sentiments not provided, predict them
+        if not sentiments:
+            preprocessed = [preprocess_comment(c) for c in comments]
+            predictions = pipeline.predict(preprocessed)
+            sentiments = [str(p) for p in predictions]
+        else:
+            sentiments = sentiments[:500]  # Match comment limit
+        
+        # Generate AI summary
+        summary = generate_ai_summary(comments, sentiments)
+        
+        return jsonify(summary), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error in /generate_ai_summary: {e}")
+        return jsonify({"error": f"Summary generation failed: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

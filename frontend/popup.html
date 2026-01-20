@@ -487,6 +487,55 @@
       display: block;
     }
     body.dark .modalImg { border-color: rgba(255,255,255,0.12); background: #0b1223; }
+
+    /* AI Summary Styles */
+    .summaryCard {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .summarySection {
+      position: relative;
+    }
+
+    .summaryLabel {
+      font-size: 11px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .summaryText {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .expandBtn {
+      margin-top: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      color: var(--accent);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+
+    .expandBtn:hover {
+      background: var(--accentSoft);
+      border-color: rgba(79,70,229,0.28);
+    }
+
+
   </style>
 </head>
 
@@ -581,40 +630,46 @@
         </div>
       </div>
 
+      
+
       <!-- INSIGHTS TAB -->
       <div class="tabContent" id="tabInsights">
         <div class="sectionTitle">AI Comment Summarization</div>
 
-        <table class="table">
-          <thead>
-            <tr>
-              <th style="width: 34%;">Section</th>
-              <th>Summary</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><b>Key Themes</b></td>
-              <td>— (Coming soon)</td>
-            </tr>
-            <tr>
-              <td><b>What Audience Loved</b></td>
-              <td>— (Coming soon)</td>
-            </tr>
-            <tr>
-              <td><b>Risks / Concerns</b></td>
-              <td>— (Coming soon)</td>
-            </tr>
-            <tr>
-              <td><b>Actionable Suggestions</b></td>
-              <td>— (Coming soon)</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="summaryCard" style="margin-bottom: 10px;">
+          <div class="summarySection">
+            <div class="summaryLabel">Key Themes</div>
+            <div class="summaryText" id="keyThemesText">Analyzing...</div>
+            <button class="expandBtn" id="keyThemesBtn" style="display: none;">Read more ▼</button>
+          </div>
+        </div>
 
-        <div class="emptyNote">
-          This section will generate an AI summary of comments and provide creator-friendly takeaways.
-          (You’ll tell me next what logic to plug in — we’ll keep the UI ready.)
+        <div class="summaryCard" style="margin-bottom: 10px;">
+          <div class="summarySection">
+            <div class="summaryLabel">What Audience Loved</div>
+            <div class="summaryText" id="audienceLovedText">Analyzing...</div>
+            <button class="expandBtn" id="audienceLovedBtn" style="display: none;">Read more ▼</button>
+          </div>
+        </div>
+
+        <div class="summaryCard" style="margin-bottom: 10px;">
+          <div class="summarySection">
+            <div class="summaryLabel">Risks / Concerns</div>
+            <div class="summaryText" id="risksConcernsText">Analyzing...</div>
+            <button class="expandBtn" id="risksConcernsBtn" style="display: none;">Read more ▼</button>
+          </div>
+        </div>
+
+        <div class="summaryCard">
+          <div class="summarySection">
+            <div class="summaryLabel">Actionable Suggestions</div>
+            <div class="summaryText" id="suggestionsText">Analyzing...</div>
+            <button class="expandBtn" id="suggestionsBtn" style="display: none;">Read more ▼</button>
+          </div>
+        </div>
+
+        <div class="emptyNote" id="insightsNote">
+          Click "Analyze this video" to generate AI-powered insights.
         </div>
       </div>
 

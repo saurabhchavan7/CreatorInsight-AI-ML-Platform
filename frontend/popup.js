@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", async () => {
   // ===== CONFIG (same as your working version) =====
-  const API_KEY = 'API_Here';  // Replace with your YouTube Data API v3 key
-  const API_URL = 'http://localhost:8888';
+  const API_KEY = '###-NM88';  // Replace with your YouTube Data API v3 key
+  const API_URL = 'http://localhost:5000';
 
   // ===== UI =====
   const pageStatus = document.getElementById("pageStatus");
@@ -56,6 +56,119 @@ document.addEventListener("DOMContentLoaded", async () => {
   let chartImgDataUrl = null;
   let trendImgDataUrl = null;
   let wordcloudImgDataUrl = null;
+
+
+  // ===== AI SUMMARY STATE =====
+  let aiSummaryData = null;
+  const summaryStates = {
+    keyThemes: { expanded: false, fullText: '', shortText: '' },
+    audienceLoved: { expanded: false, fullText: '', shortText: '' },
+    risksConcerns: { expanded: false, fullText: '', shortText: '' },
+    suggestions: { expanded: false, fullText: '', shortText: '' }
+  };
+
+  // ===== AI SUMMARY FUNCTIONS =====
+  function truncateText(text, maxLength = 150) {
+    if (!text || text.length <= maxLength) {
+      return { short: text, full: text, needsExpand: false };
+    }
+    
+    // Try to cut at a sentence or word boundary
+    let cutPoint = text.substring(0, maxLength).lastIndexOf('.');
+    if (cutPoint === -1) {
+      cutPoint = text.substring(0, maxLength).lastIndexOf(' ');
+    }
+    if (cutPoint === -1) {
+      cutPoint = maxLength;
+    }
+    
+    const short = text.substring(0, cutPoint) + '...';
+    return { short, full: text, needsExpand: true };
+  }
+
+  function setupExpandButton(btnId, textId, stateKey) {
+    const btn = document.getElementById(btnId);
+    const textEl = document.getElementById(textId);
+    const state = summaryStates[stateKey];
+    
+    if (!state.needsExpand) {
+      btn.style.display = 'none';
+      return;
+    }
+    
+    btn.style.display = 'inline-block';
+    
+    btn.addEventListener('click', () => {
+      if (state.expanded) {
+        textEl.textContent = state.shortText;
+        btn.textContent = 'Read more ▼';
+        state.expanded = false;
+      } else {
+        textEl.textContent = state.fullText;
+        btn.textContent = 'Show less ▲';
+        state.expanded = true;
+      }
+    });
+  }
+
+  async function fetchAISummary(comments, sentiments) {
+    try {
+      const response = await fetch(`${API_URL}/generate_ai_summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          comments: comments.map(c => c.text), 
+          sentiments: sentiments.map(s => String(s.sentiment))
+        })
+      });
+      
+      if (!response.ok) {
+        console.error("AI summary API error");
+        return null;
+      }
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error("Error fetching AI summary:", error);
+      return null;
+    }
+  }
+
+  function displayAISummary(summary) {
+    if (!summary || summary.error) {
+      document.getElementById('insightsNote').textContent = 
+        'AI summarization failed. Check backend configuration.';
+      return;
+    }
+    
+    // Process each section
+    const sections = [
+      { key: 'keyThemes', text: summary.key_themes, textId: 'keyThemesText', btnId: 'keyThemesBtn' },
+      { key: 'audienceLoved', text: summary.what_audience_loved, textId: 'audienceLovedText', btnId: 'audienceLovedBtn' },
+      { key: 'risksConcerns', text: summary.risks_concerns, textId: 'risksConcernsText', btnId: 'risksConcernsBtn' },
+      { key: 'suggestions', text: summary.actionable_suggestions, textId: 'suggestionsText', btnId: 'suggestionsBtn' }
+    ];
+    
+    sections.forEach(section => {
+      const truncated = truncateText(section.text, 150);
+      
+      summaryStates[section.key] = {
+        expanded: false,
+        fullText: truncated.full,
+        shortText: truncated.short,
+        needsExpand: truncated.needsExpand
+      };
+      
+      const textEl = document.getElementById(section.textId);
+      textEl.textContent = truncated.short;
+      
+      setupExpandButton(section.btnId, section.textId, section.key);
+    });
+    
+    document.getElementById('insightsNote').textContent = 
+      `AI analysis complete. Sentiment score: ${summary.metrics?.sentiment_score || 'N/A'}/10`;
+  }
 
   // ===== UTIL =====
   function setStatus(type, text) {
@@ -352,6 +465,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     // render comments for default filter
     renderComments();
 
+        // ===== ADD THIS NEW CODE -AI=====
+    setStatus("idle", "Generating AI insights...");
+    
+    aiSummaryData = await fetchAISummary(rawComments, predictions);
+    if (aiSummaryData) {
+      displayAISummary(aiSummaryData);
+    }
+    // ===== END NEW CODE- AI =====
+
     setStatus("ok", "Analysis complete. Explore tabs or export report.");
   });
 
@@ -374,152 +496,178 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
   function buildExportPayload() {
-    const totalComments = rawComments.length;
-    const uniqueCommenters = new Set(rawComments.map(c => c.authorId)).size;
+      const totalComments = rawComments.length;
+      const uniqueCommenters = new Set(rawComments.map(c => c.authorId)).size;
 
-    const totalWords = rawComments.reduce((sum, c) => {
-      const words = c.text.split(/\s+/).filter(w => w.length > 0);
-      return sum + words.length;
-    }, 0);
+      const totalWords = rawComments.reduce((sum, c) => {
+        const words = c.text.split(/\s+/).filter(w => w.length > 0);
+        return sum + words.length;
+      }, 0);
 
-    const avgWordLength = (totalWords / totalComments).toFixed(2);
+      const avgWordLength = (totalWords / totalComments).toFixed(2);
 
-    const totalSentimentScore = predictions.reduce((sum, p) => sum + parseInt(p.sentiment, 10), 0);
-    const avgSentimentScore = (totalSentimentScore / totalComments).toFixed(2);
-    const normalizedSentimentScore = (((parseFloat(avgSentimentScore) + 1) / 2) * 10).toFixed(2);
+      const totalSentimentScore = predictions.reduce((sum, p) => sum + parseInt(p.sentiment, 10), 0);
+      const avgSentimentScore = (totalSentimentScore / totalComments).toFixed(2);
+      const normalizedSentimentScore = (((parseFloat(avgSentimentScore) + 1) / 2) * 10).toFixed(2);
 
-    return {
-      meta: {
-        videoId: currentVideoId,
-        url: currentVideoUrl,
-        exportedAt: new Date().toISOString(),
-        filter: activeFilter
-      },
-      metrics: {
-        totalComments,
-        uniqueCommenters,
-        avgCommentLengthWords: avgWordLength,
-        avgSentimentScoreNormalized10: normalizedSentimentScore
-      },
-      sentimentCounts: { ...sentimentCounts },
-      assets: {
-        pieChart: chartImgDataUrl,
-        trendGraph: trendImgDataUrl,
-        wordcloud: wordcloudImgDataUrl
-      },
-      comments: getFilteredPredictions()
-    };
-  }
+      return {
+        meta: {
+          videoId: currentVideoId,
+          url: currentVideoUrl,
+          exportedAt: new Date().toISOString(),
+          filter: activeFilter
+        },
+        metrics: {
+          totalComments,
+          uniqueCommenters,
+          avgCommentLengthWords: avgWordLength,
+          avgSentimentScoreNormalized10: normalizedSentimentScore
+        },
+        sentimentCounts: { ...sentimentCounts },
+        assets: {
+          pieChart: chartImgDataUrl,
+          trendGraph: trendImgDataUrl,
+          wordcloud: wordcloudImgDataUrl
+        },
+        comments: getFilteredPredictions(),
+        aiSummary: aiSummaryData  // ← ADD THIS LINE
+      };
+    }
 
   function buildHtmlReport(payload) {
-    const f = payload.meta.filter;
-    const filterLabel = f === "all" ? "All" : (f === "1" ? "Positive" : f === "0" ? "Neutral" : "Negative");
+      const f = payload.meta.filter;
+      const filterLabel = f === "all" ? "All" : (f === "1" ? "Positive" : f === "0" ? "Neutral" : "Negative");
 
-    const pie = payload.assets.pieChart ? `<img src="${payload.assets.pieChart}" style="width:100%;border-radius:14px;border:1px solid rgba(15,23,42,0.10);" />` : "";
-    const trend = payload.assets.trendGraph ? `<img src="${payload.assets.trendGraph}" style="width:100%;border-radius:14px;border:1px solid rgba(15,23,42,0.10);" />` : "";
-    const wc = payload.assets.wordcloud ? `<img src="${payload.assets.wordcloud}" style="width:100%;border-radius:14px;border:1px solid rgba(15,23,42,0.10);" />` : "";
+      const pie = payload.assets.pieChart ? `<img src="${payload.assets.pieChart}" style="width:100%;border-radius:14px;border:1px solid rgba(15,23,42,0.10);" />` : "";
+      const trend = payload.assets.trendGraph ? `<img src="${payload.assets.trendGraph}" style="width:100%;border-radius:14px;border:1px solid rgba(15,23,42,0.10);" />` : "";
+      const wc = payload.assets.wordcloud ? `<img src="${payload.assets.wordcloud}" style="width:100%;border-radius:14px;border:1px solid rgba(15,23,42,0.10);" />` : "";
 
-    const rows = payload.comments.slice(0, 200).map((c) => {
-      const s = String(c.sentiment);
-      const badge = s === "1" ? "Positive" : s === "0" ? "Neutral" : "Negative";
-      return `
-        <tr>
-          <td style="padding:10px;border-bottom:1px solid rgba(15,23,42,0.08);font-weight:800;">${badge}</td>
-          <td style="padding:10px;border-bottom:1px solid rgba(15,23,42,0.08);color:#334155;">${escapeHtml(c.timestamp || "")}</td>
-          <td style="padding:10px;border-bottom:1px solid rgba(15,23,42,0.08);">${escapeHtml(c.comment)}</td>
-        </tr>
-      `;
-    }).join("");
+      const rows = payload.comments.slice(0, 200).map((c) => {
+        const s = String(c.sentiment);
+        const badge = s === "1" ? "Positive" : s === "0" ? "Neutral" : "Negative";
+        return `
+          <tr>
+            <td style="padding:10px;border-bottom:1px solid rgba(15,23,42,0.08);font-weight:800;">${badge}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(15,23,42,0.08);color:#334155;">${escapeHtml(c.timestamp || "")}</td>
+            <td style="padding:10px;border-bottom:1px solid rgba(15,23,42,0.08);">${escapeHtml(c.comment)}</td>
+          </tr>
+        `;
+      }).join("");
 
-    return `
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>CreatorInsight AI Report</title>
-  <style>
-    body{font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#F7F8FC;margin:0;color:#0F172A;}
-    .wrap{max-width:920px;margin:0 auto;padding:24px;}
-    .header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px;}
-    .title{font-size:20px;font-weight:950;}
-    .sub{font-size:12px;color:#64748B;margin-top:6px;line-height:1.4;}
-    .pill{font-size:12px;padding:6px 10px;border-radius:999px;background:rgba(79,70,229,0.12);border:1px solid rgba(79,70,229,0.20);font-weight:900;color:#4f46e5;}
-    .card{background:#fff;border:1px solid rgba(15,23,42,0.10);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(15,23,42,0.08);margin-bottom:14px;}
-    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
-    .metric{border:1px solid rgba(15,23,42,0.10);border-radius:14px;padding:12px;}
-    .label{font-size:11px;color:#64748B;font-weight:900;text-transform:uppercase;letter-spacing:0.3px;}
-    .value{font-size:18px;font-weight:950;margin-top:6px;}
-    h3{margin:0 0 10px 0;font-size:12px;letter-spacing:0.3px;text-transform:uppercase;}
-    table{width:100%;border-collapse:collapse;font-size:13px;}
-    .note{font-size:12px;color:#64748B;line-height:1.4;margin-top:8px;}
-  </style>
-</head>
-<body>
-  <div class="wrap">
-    <div class="header">
-      <div>
-        <div class="title">CreatorInsight AI — Report</div>
-        <div class="sub">
-          Video ID: <b>${escapeHtml(payload.meta.videoId)}</b><br/>
-          Filter: <b>${filterLabel}</b><br/>
-          Exported: ${escapeHtml(payload.meta.exportedAt)}<br/>
-          URL: ${escapeHtml(payload.meta.url || "")}
+      // AI Summary Section
+      const aiSection = payload.aiSummary ? `
+      <div class="card">
+        <h3>AI Comment Summarization</h3>
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:900;font-size:12px;color:#64748B;margin-bottom:6px;">KEY THEMES</div>
+          <div style="font-size:13px;line-height:1.5;">${escapeHtml(payload.aiSummary.key_themes)}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:900;font-size:12px;color:#64748B;margin-bottom:6px;">WHAT AUDIENCE LOVED</div>
+          <div style="font-size:13px;line-height:1.5;">${escapeHtml(payload.aiSummary.what_audience_loved)}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-weight:900;font-size:12px;color:#64748B;margin-bottom:6px;">RISKS / CONCERNS</div>
+          <div style="font-size:13px;line-height:1.5;">${escapeHtml(payload.aiSummary.risks_concerns)}</div>
+        </div>
+        <div>
+          <div style="font-weight:900;font-size:12px;color:#64748B;margin-bottom:6px;">ACTIONABLE SUGGESTIONS</div>
+          <div style="font-size:13px;line-height:1.5;">${escapeHtml(payload.aiSummary.actionable_suggestions)}</div>
         </div>
       </div>
-      <div class="pill">CreatorInsight AI</div>
-    </div>
-
-    <div class="card">
-      <h3>Metrics</h3>
-      <div class="grid">
-        <div class="metric"><div class="label">Total Comments</div><div class="value">${payload.metrics.totalComments}</div></div>
-        <div class="metric"><div class="label">Unique Commenters</div><div class="value">${payload.metrics.uniqueCommenters}</div></div>
-        <div class="metric"><div class="label">Avg Comment Length</div><div class="value">${payload.metrics.avgCommentLengthWords} words</div></div>
-        <div class="metric"><div class="label">Avg Sentiment</div><div class="value">${payload.metrics.avgSentimentScoreNormalized10}/10</div></div>
+      ` : `
+      <div class="card">
+        <h3>AI Comment Summarization</h3>
+        <div class="note">AI insights not available for this export.</div>
       </div>
-      <div class="note">Note: Comment table shows up to 200 comments for readability.</div>
-    </div>
+      `;
 
-    <div class="card">
-      <h3>Sentiment Distribution</h3>
-      ${pie}
-    </div>
+      return `
+  <!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>CreatorInsight AI Report</title>
+    <style>
+      body{font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#F7F8FC;margin:0;color:#0F172A;}
+      .wrap{max-width:920px;margin:0 auto;padding:24px;}
+      .header{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:18px;}
+      .title{font-size:20px;font-weight:950;}
+      .sub{font-size:12px;color:#64748B;margin-top:6px;line-height:1.4;}
+      .pill{font-size:12px;padding:6px 10px;border-radius:999px;background:rgba(79,70,229,0.12);border:1px solid rgba(79,70,229,0.20);font-weight:900;color:#4f46e5;}
+      .card{background:#fff;border:1px solid rgba(15,23,42,0.10);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(15,23,42,0.08);margin-bottom:14px;}
+      .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+      .metric{border:1px solid rgba(15,23,42,0.10);border-radius:14px;padding:12px;}
+      .label{font-size:11px;color:#64748B;font-weight:900;text-transform:uppercase;letter-spacing:0.3px;}
+      .value{font-size:18px;font-weight:950;margin-top:6px;}
+      h3{margin:0 0 10px 0;font-size:12px;letter-spacing:0.3px;text-transform:uppercase;}
+      table{width:100%;border-collapse:collapse;font-size:13px;}
+      .note{font-size:12px;color:#64748B;line-height:1.4;margin-top:8px;}
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="header">
+        <div>
+          <div class="title">CreatorInsight AI — Report</div>
+          <div class="sub">
+            Video ID: <b>${escapeHtml(payload.meta.videoId)}</b><br/>
+            Filter: <b>${filterLabel}</b><br/>
+            Exported: ${escapeHtml(payload.meta.exportedAt)}<br/>
+            URL: ${escapeHtml(payload.meta.url || "")}
+          </div>
+        </div>
+        <div class="pill">CreatorInsight AI</div>
+      </div>
 
-    <div class="card">
-      <h3>Sentiment Trend</h3>
-      ${trend}
-    </div>
+      <div class="card">
+        <h3>Metrics</h3>
+        <div class="grid">
+          <div class="metric"><div class="label">Total Comments</div><div class="value">${payload.metrics.totalComments}</div></div>
+          <div class="metric"><div class="label">Unique Commenters</div><div class="value">${payload.metrics.uniqueCommenters}</div></div>
+          <div class="metric"><div class="label">Avg Comment Length</div><div class="value">${payload.metrics.avgCommentLengthWords} words</div></div>
+          <div class="metric"><div class="label">Avg Sentiment</div><div class="value">${payload.metrics.avgSentimentScoreNormalized10}/10</div></div>
+        </div>
+        <div class="note">Note: Comment table shows up to 200 comments for readability.</div>
+      </div>
 
-    <div class="card">
-      <h3>Top Themes</h3>
-      ${wc}
-    </div>
+      <div class="card">
+        <h3>Sentiment Distribution</h3>
+        ${pie}
+      </div>
 
-    <div class="card">
-      <h3>AI Comment Summarization</h3>
-      <div class="note">Coming soon: key themes, audience loves, concerns, and creator suggestions.</div>
-    </div>
+      <div class="card">
+        <h3>Sentiment Trend</h3>
+        ${trend}
+      </div>
 
-    <div class="card">
-      <h3>Comments (sample)</h3>
-      <table>
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(15,23,42,0.10);">Sentiment</th>
-            <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(15,23,42,0.10);">Timestamp</th>
-            <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(15,23,42,0.10);">Comment</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows}
-        </tbody>
-      </table>
+      <div class="card">
+        <h3>Top Themes</h3>
+        ${wc}
+      </div>
+
+      ${aiSection}
+
+      <div class="card">
+        <h3>Comments (sample)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(15,23,42,0.10);">Sentiment</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(15,23,42,0.10);">Timestamp</th>
+              <th style="text-align:left;padding:10px;border-bottom:1px solid rgba(15,23,42,0.10);">Comment</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
-</body>
-</html>
-    `.trim();
-  }
+  </body>
+  </html>
+      `.trim();
+    }
 
   // ===== YouTube + Backend Calls (same as before) =====
   async function fetchComments(videoId) {

@@ -9,3 +9,18 @@ data/processed/
 .env
 
 models/
+
+backend/flask_app/config.py
+
+# Add __pycache__ to .gitignore
+cat >> .gitignore << 'EOF'
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+EOF
+
+requirements_v2.txt
