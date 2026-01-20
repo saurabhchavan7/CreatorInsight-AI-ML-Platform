@@ -1,9 +1,11 @@
 import mlflow.pyfunc
 import pytest
 from mlflow.tracking import MlflowClient
+from config import MLFLOW_TRACKING_URI, MODEL_NAME
+
 
 # Set your remote tracking URI
-mlflow.set_tracking_uri("http://ec2-3-84-182-30.compute-1.amazonaws.com:5000/")
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 @pytest.mark.parametrize("model_name, stage", [
     ("creatorinsight_sentiment_pipeline", "staging"),])

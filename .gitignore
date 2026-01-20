@@ -24,3 +24,5 @@ __pycache__/
 EOF
 
 requirements_v2.txt
+
+frontend/config.js

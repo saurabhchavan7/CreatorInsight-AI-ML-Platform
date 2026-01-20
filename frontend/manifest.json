@@ -9,6 +9,7 @@
   "permissions": ["tabs", "activeTab", "storage", "downloads"],
   "host_permissions": [
     "http://localhost:5000/*",
+    "http://*.elb.amazonaws.com/*",
     "https://www.googleapis.com/*"
   ]
 }

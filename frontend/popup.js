@@ -1,7 +1,13 @@
 document.addEventListener("DOMContentLoaded", async () => {
   // ===== CONFIG (same as your working version) =====
-  const API_KEY = '###-NM88';  // Replace with your YouTube Data API v3 key
-  const API_URL = 'http://localhost:5000';
+  // const API_KEY = '###-NM88';  // Replace with your YouTube Data API v3 key
+  // const API_URL = 'http://localhost:5000';
+
+
+  // NEW:
+  const API_KEY = CONFIG.YOUTUBE_API_KEY;
+  const API_URL = CONFIG.API_URL;
+  const MAX_COMMENTS = CONFIG.MAX_COMMENTS || 500;
 
   // ===== UI =====
   const pageStatus = document.getElementById("pageStatus");
