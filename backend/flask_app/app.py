@@ -61,7 +61,7 @@ CORS(app)  # Enable CORS for all routes
 # -----------------------------
 # Configuration
 # -----------------------------
-MLFLOW_TRACKING_URI = "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
+MLFLOW_TRACKING_URI = "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
 
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
