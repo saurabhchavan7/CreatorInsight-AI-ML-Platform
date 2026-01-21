@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Deployment/Retraining reason'
+        description: 'Deployment or retraining reason'
         default: 'Manual deployment trigger'
 
 jobs:
@@ -14,19 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # =======================================
-      # SETUP
+      # ========================================
+      # ENVIRONMENT SETUP
       # ========================================
       
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v3
       
-      - name: Set up Python
+      - name: Setup Python 3.10
         uses: actions/setup-python@v2
         with:
           python-version: '3.10'
       
-      - name: Cache pip dependencies
+      - name: Cache Python Dependencies
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
@@ -34,10 +34,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
       
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install Python Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
       
-      - name: Configure AWS
+      - name: Configure AWS Credentials
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -47,116 +49,184 @@ jobs:
           aws configure set region us-east-1
       
       # ========================================
-      # SMART DETECTION - Check S3 for retraining data
+      # DVC DATA SYNCHRONIZATION
       # ========================================
       
-      - name: Detect Pipeline Mode
+      - name: Pull DVC-Tracked Data from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          echo "Downloading DVC-tracked data from S3 remote storage..."
+          dvc pull
+          
+          echo "Verifying data restoration..."
+          if [ -f "data/interim/train.csv" ]; then
+            train_rows=$(wc -l < data/interim/train.csv)
+            echo "Train data restored: $train_rows rows"
+          else
+            echo "Warning: Train data not found (first run - will download fresh)"
+          fi
+      
+      # ========================================
+      # RETRAINING MODE DETECTION
+      # ========================================
+      
+      - name: Detect Pipeline Mode (Normal vs Retraining)
         id: detect_mode
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
-          count=$(aws s3 ls s3://creator-insight-dvc-bucket/retraining_data/ \
+          echo "Checking S3 for saved prediction files..."
+          
+          file_count=$(aws s3 ls s3://creator-insight-dvc-bucket/retraining_data/ \
             --recursive | grep -v '/archive/' | grep '.json$' | wc -l)
           
-          if [ "$count" -gt 0 ]; then
+          if [ "$file_count" -gt 0 ]; then
             echo "mode=retrain" >> $GITHUB_OUTPUT
-            echo "file_count=$count" >> $GITHUB_OUTPUT
-            echo "✅ RETRAINING MODE: Found $count prediction files"
+            echo "file_count=$file_count" >> $GITHUB_OUTPUT
+            echo "RETRAINING MODE ACTIVATED"
+            echo "Found $file_count prediction file(s) in S3"
+            echo "Pipeline will download, select best samples, and merge with training data"
           else
             echo "mode=normal" >> $GITHUB_OUTPUT
             echo "file_count=0" >> $GITHUB_OUTPUT
-            echo "ℹ️  NORMAL MODE: No retraining data"
+            echo "NORMAL MODE ACTIVATED"
+            echo "No retraining data found in S3"
+            echo "Pipeline will use existing data or download fresh if needed"
           fi
       
       # ========================================
-      # RETRAINING STEPS (Only if data exists in S3)
+      # RETRAINING WORKFLOW (Conditional Execution)
       # ========================================
       
-      - name: Download & Select Retraining Data
+      - name: Download and Select Retraining Data
         if: steps.detect_mode.outputs.mode == 'retrain'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: python scripts/retraining/1_download_and_select.py
+        run: |
+          echo "Executing enterprise 3-tier data selection strategy..."
+          python scripts/retraining/1_download_and_select.py
+          
+          echo "Verifying selection output..."
+          if [ -f "data/retraining/new_samples.csv" ]; then
+            sample_count=$(wc -l < data/retraining/new_samples.csv)
+            echo "Selected $sample_count high-quality examples for retraining"
+          else
+            echo "ERROR: Selection script failed to create output file"
+            exit 1
+          fi
       
       - name: Merge New Data with Training Set
         if: steps.detect_mode.outputs.mode == 'retrain'
-        run: python scripts/retraining/2_merge_with_training.py
+        run: |
+          echo "Merging selected samples with existing training data..."
+          python scripts/retraining/2_merge_with_training.py
+          
+          echo "Verifying merge completion..."
+          if [ -f "data/interim/train.csv" ]; then
+            merged_rows=$(wc -l < data/interim/train.csv)
+            echo "Training set now contains $merged_rows total rows"
+          else
+            echo "ERROR: Merge script failed"
+            exit 1
+          fi
       
       # ========================================
-      # DVC PIPELINE (Always runs - handles both modes)
+      # DVC PIPELINE EXECUTION
       # ========================================
       
-      - name: Run DVC Pipeline
+      - name: Execute DVC Pipeline
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
-        run: dvc repro --force
+        run: |
+          if [ "${{ steps.detect_mode.outputs.mode }}" = "retrain" ]; then
+            echo "Running DVC pipeline with merged training data (retraining mode)..."
+          else
+            echo "Running DVC pipeline with standard data (normal mode)..."
+          fi
+          
+          dvc repro --force
       
-      - name: Push DVC Outputs to S3
+      - name: Push DVC Outputs to Remote Storage
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: dvc push
+        run: |
+          echo "Uploading pipeline outputs to S3..."
+          dvc push
+          echo "DVC outputs synchronized with remote storage"
       
       # ========================================
-      # GIT COMMIT (Skip if triggered by bot)
+      # VERSION CONTROL MANAGEMENT
       # ========================================
       
-      - name: Configure Git
+      - name: Configure Git Bot Identity
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
       
-      - name: Commit DVC Changes
+      - name: Commit Pipeline Changes
         if: ${{ github.actor != 'github-actions[bot]' }}
         run: |
           git add dvc.lock
           
           if [ "${{ steps.detect_mode.outputs.mode }}" = "retrain" ]; then
-            git commit -m "retrain: Model retrained with ${{ steps.detect_mode.outputs.file_count }} predictions" || echo "No changes"
+            commit_msg="retrain: Model retrained with ${{ steps.detect_mode.outputs.file_count }} new prediction files"
           else
-            git commit -m "ci: Updated DVC pipeline outputs" || echo "No changes"
+            commit_msg="ci: Updated DVC pipeline outputs"
           fi
+          
+          git commit -m "$commit_msg" || echo "No changes to commit"
       
-      - name: Push Changes
+      - name: Push Changes to Repository
         if: ${{ github.actor != 'github-actions[bot]' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: git push origin ${{ github.ref_name }}
+        run: |
+          git push origin ${{ github.ref_name }}
       
       # ========================================
-      # MODEL TESTING
+      # MODEL VALIDATION TESTS
       # ========================================
       
-      - name: Install test dependencies
-        run: pip install pytest
+      - name: Install Test Framework
+        run: |
+          pip install pytest
       
-      - name: Test Model Loading
+      - name: Test Model Loading from Registry
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
-        run: pytest scripts/test_load_model.py
+        run: |
+          echo "Validating model can be loaded from MLflow Registry..."
+          pytest scripts/test_load_model.py -v
       
-      - name: Test Model Signature
+      - name: Test Model Signature Compatibility
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
-        run: pytest scripts/test_model_signature.py
+        run: |
+          echo "Validating model input/output signature..."
+          pytest scripts/test_model_signature.py -v
       
-      - name: Test Model Performance
+      - name: Test Model Performance Thresholds
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
-        run: pytest scripts/test_model_performance.py
+        run: |
+          echo "Validating model meets minimum performance requirements..."
+          pytest scripts/test_model_performance.py -v
       
       # ========================================
-      # MODEL COMPARISON & PROMOTION
+      # MODEL COMPARISON AND PROMOTION
       # ========================================
       
       - name: Compare Staging vs Production Models
@@ -166,6 +236,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
         run: |
+          echo "Comparing newly trained model against current production model..."
           python scripts/compare_models.py > comparison.txt
           cat comparison.txt
       
@@ -175,119 +246,167 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
-        run: python scripts/promote_model.py
+        run: |
+          echo "Promoting validated model to production stage..."
+          python scripts/promote_model.py
       
       # ========================================
-      # FLASK API TESTING
+      # FLASK API VALIDATION
       # ========================================
       
-      - name: Start Flask App
+      - name: Start Flask Application
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           MLFLOW_TRACKING_URI: "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          echo "Starting Flask API server for testing..."
           python backend/flask_app/app.py > flask.log 2>&1 &
           FLASK_PID=$!
           
-          echo "Waiting for Flask to start..."
+          echo "Waiting for Flask initialization (model loading takes time)..."
           sleep 20
           
           if ! kill -0 $FLASK_PID 2>/dev/null; then
-            echo "❌ Flask crashed!"
+            echo "ERROR: Flask failed to start"
+            echo "Flask logs:"
             cat flask.log
             exit 1
           fi
           
-          for i in {1..10}; do
+          echo "Testing Flask endpoint availability..."
+          for attempt in {1..10}; do
             if curl -f http://localhost:5000/ 2>/dev/null; then
-              echo "✅ Flask is responding"
+              echo "Flask API is responding successfully"
               break
             fi
+            echo "Retry $attempt/10..."
             sleep 2
           done
           
-          echo "=== Flask Logs ==="
+          echo "Flask startup logs:"
           cat flask.log
       
-      - name: Run Flask API Tests
-        run: pytest scripts/test_flask_api.py
+      - name: Run Flask API Integration Tests
+        run: |
+          echo "Testing all Flask API endpoints..."
+          pytest scripts/test_flask_api.py -v
       
       # ========================================
-      # DOCKER BUILD & PUSH
+      # DOCKER BUILD AND REGISTRY PUSH
       # ========================================
       
-      - name: Login to AWS ECR
+      - name: Authenticate with AWS ECR
         if: success()
         run: |
+          echo "Authenticating Docker with AWS ECR..."
           aws ecr get-login-password --region us-east-1 | \
           docker login --username AWS --password-stdin 992382586780.dkr.ecr.us-east-1.amazonaws.com
       
       - name: Build Docker Image
         if: success()
-        run: docker build -t creatorinsight-flask-api .
+        run: |
+          echo "Building Docker image with updated model..."
+          docker build -t creatorinsight-flask-api .
       
-      - name: Tag Docker Image
+      - name: Tag Docker Image for ECR
         if: success()
         run: |
+          echo "Tagging image for ECR repository..."
           docker tag creatorinsight-flask-api:latest \
           992382586780.dkr.ecr.us-east-1.amazonaws.com/creatorinsight-ml-api:latest
       
-      - name: Push to AWS ECR
+      - name: Push Docker Image to ECR
         if: success()
         run: |
+          echo "Pushing Docker image to AWS ECR..."
           docker push 992382586780.dkr.ecr.us-east-1.amazonaws.com/creatorinsight-ml-api:latest
+          echo "Docker image pushed successfully"
       
       # ========================================
-      # AWS CODEDEPLOY
+      # AWS CODEDEPLOY PREPARATION
       # ========================================
       
-      - name: Zip Deployment Files
+      - name: Create Deployment Package
         if: success()
         run: |
+          echo "Creating deployment package..."
           zip -r deployment.zip appspec.yml deploy/scripts/install_dependencies.sh deploy/scripts/start_docker.sh
+          echo "Deployment package created: deployment.zip"
       
-      - name: Upload to S3
+      - name: Upload Deployment Package to S3
         if: success()
         run: |
+          echo "Uploading deployment package to S3..."
           aws s3 cp deployment.zip s3://yt-plugin-codedeploy-bucket/deployment.zip
+          echo "Deployment package uploaded successfully"
       
-      - name: Deploy via CodeDeploy
+      - name: Trigger AWS CodeDeploy
         if: success()
         run: |
-          aws deploy create-deployment \
+          echo "Initiating CodeDeploy deployment to EC2 instances..."
+          
+          deployment_id=$(aws deploy create-deployment \
             --application-name YTChromePlugin \
             --deployment-config-name CodeDeployDefault.OneAtATime \
             --deployment-group-name YtChromeDeploymentGroup \
             --s3-location bucket=yt-plugin-codedeploy-bucket,key=deployment.zip,bundleType=zip \
             --file-exists-behavior OVERWRITE \
-            --region us-east-1
+            --region us-east-1 \
+            --query 'deploymentId' \
+            --output text)
+          
+          echo "Deployment initiated: $deployment_id"
+          echo "Monitor deployment at AWS CodeDeploy console"
       
       # ========================================
-      # CLEANUP (Retrain mode only)
+      # POST-DEPLOYMENT CLEANUP
       # ========================================
       
-      - name: Cleanup Temporary Files
+      - name: Cleanup Temporary Retraining Files
         if: always() && steps.detect_mode.outputs.mode == 'retrain'
-        run: python scripts/retraining/3_cleanup_files.py
+        run: |
+          echo "Cleaning up temporary retraining files..."
+          python scripts/retraining/3_cleanup_files.py
       
       # ========================================
-      # SUMMARY
+      # WORKFLOW SUMMARY REPORT
       # ========================================
       
-      - name: Pipeline Summary
+      - name: Generate Workflow Summary
         if: always()
         run: |
-          echo "### 🎉 Pipeline Complete" >> $GITHUB_STEP_SUMMARY
+          echo "### Pipeline Execution Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Mode**: ${{ steps.detect_mode.outputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Execution Mode**: ${{ steps.detect_mode.outputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "**Reason**: ${{ github.event.inputs.reason }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           if [ "${{ steps.detect_mode.outputs.mode }}" = "retrain" ]; then
-            echo "**Prediction Files**: ${{ steps.detect_mode.outputs.file_count }}" >> $GITHUB_STEP_SUMMARY
+            echo "#### Retraining Details" >> $GITHUB_STEP_SUMMARY
+            echo "- Prediction files processed: ${{ steps.detect_mode.outputs.file_count }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Data selection: Enterprise 3-tier strategy applied" >> $GITHUB_STEP_SUMMARY
+            echo "- Training data: Updated with new samples" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Model Comparison**:" >> $GITHUB_STEP_SUMMARY
-            cat comparison.txt >> $GITHUB_STEP_SUMMARY || echo "N/A" >> $GITHUB_STEP_SUMMARY
+            echo "#### Model Comparison Results" >> $GITHUB_STEP_SUMMARY
+            if [ -f "comparison.txt" ]; then
+              cat comparison.txt >> $GITHUB_STEP_SUMMARY
+            else
+              echo "Comparison data not available" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "**Status**: Normal deployment" >> $GITHUB_STEP_SUMMARY
+            echo "#### Standard Deployment" >> $GITHUB_STEP_SUMMARY
+            echo "- Mode: Normal pipeline execution" >> $GITHUB_STEP_SUMMARY
+            echo "- Data: Existing training data used" >> $GITHUB_STEP_SUMMARY
+            echo "- Status: Model validated and deployed" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Automated by CreatorInsight AI CICD System*" >> $GITHUB_STEP_SUMMARY
