@@ -37,11 +37,11 @@ def load_test_data():
         X_test = [x for x, y in valid]
         y_test = [y for x, y in valid]
         
-        print(f"📊 Loaded test data: {len(X_test)} valid samples\n")
+        print(f"Loaded test data: {len(X_test)} valid samples\n")
         return X_test, y_test
         
     except Exception as e:
-        print(f"❌ Failed to load test data: {e}")
+        print(f" Failed to load test data: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
@@ -55,7 +55,7 @@ def evaluate_model(model, X_test, y_test, model_label):
         # Predict
         y_pred = model.predict(X_test)
         
-        print(f"   ✅ Predictions complete ({len(y_pred)} samples)")
+        print(f" Predictions complete ({len(y_pred)} samples)")
         
         # Calculate metrics
         f1_macro = f1_score(y_test, y_pred, average='macro')
@@ -90,7 +90,7 @@ def evaluate_model(model, X_test, y_test, model_label):
         return metrics
         
     except Exception as e:
-        print(f"\n❌ Evaluation failed for {model_label}")
+        print(f"\nEvaluation failed for {model_label}")
         print(f"   Error: {e}")
         import traceback
         traceback.print_exc()
@@ -107,21 +107,21 @@ def main():
     
     # ===== LOAD STAGING MODEL (NEWLY TRAINED) =====
     try:
-        print("📦 Loading STAGING model (newly trained)...")
+        print("Loading STAGING model (newly trained)...")
         staging_uri = f"models:/{MODEL_NAME}/Staging"
         staging_model = mlflow.sklearn.load_model(staging_uri)
-        print("   ✅ Staging model loaded\n")
+        print(" Staging model loaded\n")
     except Exception as e:
-        print(f"❌ Failed to load staging model: {e}")
+        print(f"Failed to load staging model: {e}")
         print("   Make sure a model exists in Staging stage")
         sys.exit(1)
     
     # ===== LOAD PRODUCTION MODEL (CURRENT) =====
     try:
-        print("🚀 Loading PRODUCTION model (current)...")
+        print("Loading PRODUCTION model (current)...")
         prod_uri = f"models:/{MODEL_NAME}/Production"
         prod_model = mlflow.sklearn.load_model(prod_uri)
-        print("   ✅ Production model loaded\n")
+        print(" Production model loaded\n")
         has_production = True
     except Exception as e:
         print(f"ℹ️  No production model found (first deployment?)")
@@ -156,7 +156,7 @@ def main():
         print("="*70)
         
         if f1_improvement >= IMPROVEMENT_THRESHOLD:
-            print(f"✅ PROMOTE NEW MODEL")
+            print(f"PROMOTE NEW MODEL")
             print(f"   Reason: F1 improvement of {f1_improvement*100:.2f}% exceeds {IMPROVEMENT_THRESHOLD*100}% threshold")
             print(f"   Staging: {staging_metrics['f1_macro']:.4f}")
             print(f"   Production: {prod_metrics['f1_macro']:.4f}")
@@ -171,7 +171,7 @@ def main():
             sys.exit(0)  # Success - promote
             
         else:
-            print(f"❌ REJECT NEW MODEL")
+            print(f"REJECT NEW MODEL")
             print(f"   Reason: New model performs WORSE")
             print(f"   F1 decline: {f1_improvement*100:.2f}%")
             print(f"   Keep current production model")
@@ -183,7 +183,7 @@ def main():
         print("="*70)
         print("DECISION")
         print("="*70)
-        print("✅ PROMOTE TO PRODUCTION")
+        print("PROMOTE TO PRODUCTION")
         print("   Reason: No existing production model (first deployment)")
         print(f"   Staging F1: {staging_metrics['f1_macro']:.4f}")
         print()

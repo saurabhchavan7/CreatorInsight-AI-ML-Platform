@@ -61,7 +61,7 @@ CORS(app)  # Enable CORS for all routes
 # -----------------------------
 # Configuration
 # -----------------------------
-MLFLOW_TRACKING_URI = "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
+MLFLOW_TRACKING_URI = "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
 
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -70,6 +70,79 @@ mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 MODEL_NAME = "creatorinsight_sentiment_pipeline"
 MODEL_VERSION = "Production"  # you can switch to "Production" later if you use stages
+
+
+
+# -----------------------------
+# AWS CloudWatch Configuration
+# -----------------------------
+
+import time
+from functools import wraps
+
+# CloudWatch logging
+try:
+    import boto3
+    cloudwatch = boto3.client('cloudwatch', region_name='us-east-1')
+    CLOUDWATCH_ENABLED = True
+    print("[INFO] CloudWatch metrics enabled")
+except Exception as e:
+    CLOUDWATCH_ENABLED = False
+    print(f"[WARNING] CloudWatch disabled: {e}")
+
+# -----------------------------
+# AWS CloudWatch Decorator
+# -----------------------------
+
+def monitor_endpoint(metric_name):
+    """Decorator to monitor API endpoints with CloudWatch"""
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            start_time = time.time()
+            error_occurred = False
+            
+            try:
+                result = f(*args, **kwargs)
+                return result
+            except Exception as e:
+                error_occurred = True
+                raise
+            finally:
+                # Calculate response time
+                response_time = (time.time() - start_time) * 1000  # milliseconds
+                
+                # Log to CloudWatch
+                if CLOUDWATCH_ENABLED:
+                    try:
+                        cloudwatch.put_metric_data(
+                            Namespace='CreatorInsight/API',
+                            MetricData=[
+                                {
+                                    'MetricName': f'{metric_name}_ResponseTime',
+                                    'Value': response_time,
+                                    'Unit': 'Milliseconds',
+                                    'Timestamp': time.time()
+                                },
+                                {
+                                    'MetricName': f'{metric_name}_RequestCount',
+                                    'Value': 1,
+                                    'Unit': 'Count',
+                                    'Timestamp': time.time()
+                                },
+                                {
+                                    'MetricName': f'{metric_name}_ErrorCount',
+                                    'Value': 1 if error_occurred else 0,
+                                    'Unit': 'Count',
+                                    'Timestamp': time.time()
+                                }
+                            ]
+                        )
+                    except Exception as cw_error:
+                        print(f"CloudWatch logging failed: {cw_error}")
+        
+        return wrapper
+    return decorator
 
 
 # -----------------------------
@@ -270,8 +343,93 @@ def home():
     return "Welcome to our flask api"
 
 
+# @app.route("/predict_with_timestamps", methods=["POST"])
+# @monitor_endpoint("PredictWithTimestamps")  # ADD THIS LINE for monitoring on this endpoint at CloudWatch
+# def predict_with_timestamps():
+#     ok, resp, code = ensure_pipeline_loaded()
+#     if not ok:
+#         return resp, code
+
+#     data = request.json
+#     comments_data = data.get("comments")
+
+#     if not comments_data:
+#         return jsonify({"error": "No comments provided"}), 400
+
+#     try:
+#         comments = [item.get("text", "") for item in comments_data]
+#         timestamps = [item.get("timestamp") for item in comments_data]
+
+#         preprocessed_comments = [preprocess_comment(comment) for comment in comments]
+
+#         # Get predictions
+#         preds = pipeline.predict(preprocessed_comments)
+        
+#         # Get confidence scores (NEW!)
+#         try:
+#             proba = pipeline.predict_proba(preprocessed_comments)
+#             # Confidence = max probability for predicted class
+#             confidences = [float(max(prob)) for prob in proba]
+#         except Exception as e:
+#             print(f"Warning: Could not get confidence scores: {e}")
+#             confidences = [None] * len(preds)
+
+#         # Normalize predictions
+#         if isinstance(preds, (np.ndarray, list)):
+#             predictions = [str(p) for p in list(preds)]
+#         else:
+#             predictions = [str(preds)]
+
+        
+#         # ========================================
+#         # ADD CLOUDWATCH LOGGING HERE 
+#         # ========================================
+#         if CLOUDWATCH_ENABLED and confidences:
+#             avg_confidence = sum(c for c in confidences if c is not None) / len(confidences)
+            
+#             cloudwatch.put_metric_data(
+#                 Namespace='CreatorInsight/Model',
+#                 MetricData=[
+#                     {
+#                         'MetricName': 'AverageConfidence',
+#                         'Value': avg_confidence,
+#                         'Unit': 'None',
+#                         'Timestamp': time.time()
+#                     },
+#                     {
+#                         'MetricName': 'PredictionCount',
+#                         'Value': len(predictions),
+#                         'Unit': 'Count',
+#                         'Timestamp': time.time()
+#                     }
+#                 ]
+#             )
+#         # ========================================
+#         # END OF CLOUDWATCH LOGGING
+#         # ========================================
+
+
+#     except Exception as e:
+#         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+
+#     response = [
+#         {
+#             "comment": comment, 
+#             "sentiment": sentiment, 
+#             "timestamp": timestamp,
+#             "confidence": confidence  # NEW FIELD!
+#         }
+#         for comment, sentiment, timestamp, confidence 
+#         in zip(comments, predictions, timestamps, confidences)
+#     ]
+#     return jsonify(response)
+
+
 @app.route("/predict_with_timestamps", methods=["POST"])
 def predict_with_timestamps():
+    start_time = time.time()
+    error_occurred = False
+    
     ok, resp, code = ensure_pipeline_loaded()
     if not ok:
         return resp, code
@@ -285,44 +443,92 @@ def predict_with_timestamps():
     try:
         comments = [item.get("text", "") for item in comments_data]
         timestamps = [item.get("timestamp") for item in comments_data]
-
         preprocessed_comments = [preprocess_comment(comment) for comment in comments]
 
-        # Get predictions
+        # Get predictions and confidence
         preds = pipeline.predict(preprocessed_comments)
         
-        # Get confidence scores (NEW!)
         try:
             proba = pipeline.predict_proba(preprocessed_comments)
-            # Confidence = max probability for predicted class
             confidences = [float(max(prob)) for prob in proba]
+            avg_confidence = sum(confidences) / len(confidences)
         except Exception as e:
             print(f"Warning: Could not get confidence scores: {e}")
             confidences = [None] * len(preds)
+            avg_confidence = None
 
-        # Normalize predictions
         if isinstance(preds, (np.ndarray, list)):
             predictions = [str(p) for p in list(preds)]
         else:
             predictions = [str(preds)]
+        
+        # CloudWatch logging
+        response_time = (time.time() - start_time) * 1000
+        
+        if CLOUDWATCH_ENABLED:
+            try:
+                metrics = [
+                    {
+                        'MetricName': 'API_ResponseTime',
+                        'Value': response_time,
+                        'Unit': 'Milliseconds'
+                    },
+                    {
+                        'MetricName': 'API_RequestCount',
+                        'Value': 1,
+                        'Unit': 'Count'
+                    },
+                    {
+                        'MetricName': 'PredictionCount',
+                        'Value': len(predictions),
+                        'Unit': 'Count'
+                    }
+                ]
+                
+                if avg_confidence:
+                    metrics.append({
+                        'MetricName': 'AverageConfidence',
+                        'Value': avg_confidence,
+                        'Unit': 'None'
+                    })
+                
+                cloudwatch.put_metric_data(
+                    Namespace='CreatorInsight',
+                    MetricData=metrics
+                )
+            except Exception as e:
+                print(f"CloudWatch error: {e}")
 
     except Exception as e:
+        error_occurred = True
+        
+        if CLOUDWATCH_ENABLED:
+            cloudwatch.put_metric_data(
+                Namespace='CreatorInsight',
+                MetricData=[{
+                    'MetricName': 'API_ErrorCount',
+                    'Value': 1,
+                    'Unit': 'Count'
+                }]
+            )
+        
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     response = [
         {
-            "comment": comment, 
-            "sentiment": sentiment, 
+            "comment": comment,
+            "sentiment": sentiment,
             "timestamp": timestamp,
-            "confidence": confidence  # NEW FIELD!
+            "confidence": confidence
         }
-        for comment, sentiment, timestamp, confidence 
+        for comment, sentiment, timestamp, confidence
         in zip(comments, predictions, timestamps, confidences)
     ]
     return jsonify(response)
 
 
 @app.route("/predict", methods=["POST"])
+@monitor_endpoint("Predict")  # ADD
 def predict():
     ok, resp, code = ensure_pipeline_loaded()
     if not ok:
@@ -361,6 +567,7 @@ def predict():
 
 
 @app.route("/generate_chart", methods=["POST"])
+@monitor_endpoint("GenerateChart")  # ADD
 def generate_chart():
     try:
         data = request.get_json()
@@ -403,6 +610,7 @@ def generate_chart():
 
 
 @app.route("/generate_wordcloud", methods=["POST"])
+@monitor_endpoint("GenerateWordcloud")  # ADD
 def generate_wordcloud():
     try:
         data = request.get_json()
@@ -440,6 +648,7 @@ def generate_wordcloud():
 
 
 @app.route("/generate_trend_graph", methods=["POST"])
+@monitor_endpoint("GenerateTrendGraph")  # ADD
 def generate_trend_graph():
     try:
         data = request.get_json()
@@ -500,6 +709,7 @@ def generate_trend_graph():
         return jsonify({"error": f"Trend graph generation failed: {str(e)}"}), 500
     
 @app.route("/generate_ai_summary", methods=["POST"])
+@monitor_endpoint("SaveForRetraining")  # ADD
 def generate_ai_summary_endpoint():
     """
     Generate AI-powered summary from comments

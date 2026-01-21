@@ -16,7 +16,7 @@ jobs:
     steps:
       # ========================================
       # ENVIRONMENT SETUP
-      # =======================================
+      # ========================================
       
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -142,7 +142,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
         run: |
           if [ "${{ steps.detect_mode.outputs.mode }}" = "retrain" ]; then
             echo "Running DVC pipeline with merged training data (retraining mode)..."
@@ -151,6 +151,62 @@ jobs:
           fi
           
           dvc repro --force
+    
+      # =========================================================
+      # >>> NEW: MONITORING (NON-BLOCKING, INFORMATIONAL ONLY)
+      # =========================================================
+
+      - name: Drift Detection Summary
+        continue-on-error: true
+        run: |
+          python scripts/monitoring/detect_drift.py || true
+
+      - name: Append Drift Summary to Workflow Report
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, os
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          path = "drift_detection_result.json"
+
+          with open(summary, "a") as s:
+              s.write("\n### Drift Detection\n\n")
+              if not os.path.exists(path):
+                  s.write("- Drift report not generated\n")
+              else:
+                  d = json.load(open(path))
+                  s.write(f"- Drift detected: {d['drift_detected']}\n")
+                  s.write(f"- Comment length change (%): {d['length_change_percentage']}\n")
+                  ch = d['sentiment_distribution_change']
+                  s.write(f"- Sentiment change (%): -1={ch['-1']}, 0={ch['0']}, 1={ch['1']}\n")
+          PY
+
+      - name: Model Performance Snapshot (MLflow)
+        continue-on-error: true
+        env:
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+        run: |
+          python scripts/monitoring/track_model_performance.py
+
+      - name: Append Model Performance Snapshot
+        if: always()
+        run: |
+          python - <<'PY'
+          import os, pandas as pd
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          path = "model_performance_history.csv"
+
+          with open(summary, "a") as s:
+              s.write("\n### Model Performance Snapshot\n\n")
+              if not os.path.exists(path):
+                  s.write("- No performance data available\n")
+              else:
+                  df = pd.read_csv(path).tail(3)
+                  df[["f1_score","accuracy","negative_recall"]] = \
+                      df[["f1_score","accuracy","negative_recall"]].round(3)
+                  s.write(df[["version","stage","f1_score","accuracy","negative_recall"]].to_markdown(index=False))
+                  s.write("\n")
+          PY
       
       - name: Push DVC Outputs to Remote Storage
         env:
@@ -202,7 +258,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
         run: |
           echo "Validating model can be loaded from MLflow Registry..."
           pytest scripts/test_load_model.py -v
@@ -211,7 +267,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
         run: |
           echo "Validating model input/output signature..."
           pytest scripts/test_model_signature.py -v
@@ -220,7 +276,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
         run: |
           echo "Validating model meets minimum performance requirements..."
           pytest scripts/test_model_performance.py -v
@@ -234,7 +290,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
         run: |
           echo "Comparing newly trained model against current production model..."
           python scripts/compare_models.py > comparison.txt
@@ -245,7 +301,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
         run: |
           echo "Promoting validated model to production stage..."
           python scripts/promote_model.py
@@ -259,7 +315,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
-          MLFLOW_TRACKING_URI: "http://ec2-100-53-6-230.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           echo "Starting Flask API server for testing..."

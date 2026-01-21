@@ -1,0 +1,14 @@
+{
+  "drift_detected": true,
+  "length_drift": true,
+  "sentiment_drift": true,
+  "baseline_avg_length": 20.37,
+  "production_avg_length": 24.49,
+  "length_change_percentage": 20.25,
+  "sentiment_distribution_change": {
+    "-1": -13.38,
+    "0": -4.02,
+    "1": 17.4
+  },
+  "timestamp": "2026-01-21T18:00:05.403304"
+}
