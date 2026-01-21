@@ -57,20 +57,10 @@ CORS(app)  # Enable CORS for all routes
 # -----------------------------
 # Configuration
 # -----------------------------
-try:
-    from config import MLFLOW_TRACKING_URI as CONFIG_MLFLOW_URI
-except ImportError:
-    CONFIG_MLFLOW_URI = None
+MLFLOW_TRACKING_URI = "http://ec2-34-203-14-116.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
 
-MLFLOW_TRACKING_URI = (
-    os.getenv("MLFLOW_TRACKING_URI")
-    or CONFIG_MLFLOW_URI
-)
 
-if not MLFLOW_TRACKING_URI:
-    raise RuntimeError("MLFLOW_TRACKING_URI is not set")
-
-# mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 # print(f"[INFO] Using MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
 
