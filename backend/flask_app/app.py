@@ -17,6 +17,10 @@ import pandas as pd
 import matplotlib.dates as mdates
 import os
 
+
+import boto3
+from datetime import datetime
+
 # NLTK imports (safe-guarded usage below)
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
@@ -57,7 +61,7 @@ CORS(app)  # Enable CORS for all routes
 # -----------------------------
 # Configuration
 # -----------------------------
-MLFLOW_TRACKING_URI = "http://ec2-34-236-144-23.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
+MLFLOW_TRACKING_URI = "http://ec2-34-224-61-5.compute-1.amazonaws.com:5000/"  # ← FALLBACK HERE
 
 
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
@@ -65,7 +69,7 @@ mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 # print(f"[INFO] Using MLflow Tracking URI: {MLFLOW_TRACKING_URI}")
 
 MODEL_NAME = "creatorinsight_sentiment_pipeline"
-MODEL_VERSION = "1"  # you can switch to "Production" later if you use stages
+MODEL_VERSION = "Production"  # you can switch to "Production" later if you use stages
 
 
 # -----------------------------
@@ -284,11 +288,19 @@ def predict_with_timestamps():
 
         preprocessed_comments = [preprocess_comment(comment) for comment in comments]
 
-        # Pipeline expects raw text inputs (list of strings)
+        # Get predictions
         preds = pipeline.predict(preprocessed_comments)
+        
+        # Get confidence scores (NEW!)
+        try:
+            proba = pipeline.predict_proba(preprocessed_comments)
+            # Confidence = max probability for predicted class
+            confidences = [float(max(prob)) for prob in proba]
+        except Exception as e:
+            print(f"Warning: Could not get confidence scores: {e}")
+            confidences = [None] * len(preds)
 
-
-        # normalize output to list[str]
+        # Normalize predictions
         if isinstance(preds, (np.ndarray, list)):
             predictions = [str(p) for p in list(preds)]
         else:
@@ -298,8 +310,14 @@ def predict_with_timestamps():
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
     response = [
-        {"comment": comment, "sentiment": sentiment, "timestamp": timestamp}
-        for comment, sentiment, timestamp in zip(comments, predictions, timestamps)
+        {
+            "comment": comment, 
+            "sentiment": sentiment, 
+            "timestamp": timestamp,
+            "confidence": confidence  # NEW FIELD!
+        }
+        for comment, sentiment, timestamp, confidence 
+        in zip(comments, predictions, timestamps, confidences)
     ]
     return jsonify(response)
 
@@ -321,7 +339,14 @@ def predict():
 
         preds = pipeline.predict(preprocessed_comments)
 
-
+        # Get confidence scores (NEW!)
+        try:
+            proba = pipeline.predict_proba(preprocessed_comments)
+            # Confidence = max probability for predicted class
+            confidences = [float(max(prob)) for prob in proba]
+        except Exception as e:
+            print(f"Warning: Could not get confidence scores: {e}")
+            confidences = [None] * len(preds)
 
         if isinstance(preds, (np.ndarray, list)):
             predictions = [str(p) for p in list(preds)]
@@ -331,7 +356,7 @@ def predict():
     except Exception as e:
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
-    response = [{"comment": comment, "sentiment": sentiment} for comment, sentiment in zip(comments, predictions)]
+    response = [{"comment": comment, "sentiment": sentiment, "confidence": confidence} for comment, sentiment, confidence in zip(comments, predictions, confidences)]
     return jsonify(response)
 
 
@@ -517,6 +542,72 @@ def generate_ai_summary_endpoint():
         app.logger.error(f"Error in /generate_ai_summary: {e}")
         return jsonify({"error": f"Summary generation failed: {str(e)}"}), 500
 
+
+@app.route("/save_for_retraining", methods=["POST"])
+def save_for_retraining():
+    """
+    Save predictions to S3 for future retraining
+    
+    Request body:
+    {
+      "video_id": "dQw4w9WgXcQ",
+      "comments": ["comment1", "comment2", ...],
+      "predictions": [
+        {"comment": "...", "sentiment": "1", "confidence": 0.95, "timestamp": "..."},
+        ...
+      ]
+    }
+    """
+    try:
+        data = request.get_json()
+        video_id = data.get("video_id", "unknown")
+        predictions = data.get("predictions", [])
+        
+        if not predictions or len(predictions) == 0:
+            return jsonify({"error": "No predictions to save"}), 400
+        
+        # Create save data with metadata
+        save_data = {
+            "video_id": video_id,
+            "saved_at": datetime.now().isoformat(),
+            "count": len(predictions),
+            "metadata": {
+                "avg_confidence": sum(p.get("confidence", 0) for p in predictions if p.get("confidence")) / len(predictions),
+                "sentiment_distribution": {
+                    "positive": sum(1 for p in predictions if str(p.get("sentiment")) == "1"),
+                    "neutral": sum(1 for p in predictions if str(p.get("sentiment")) == "0"),
+                    "negative": sum(1 for p in predictions if str(p.get("sentiment")) == "-1")
+                }
+            },
+            "data": predictions
+        }
+        
+        # Save to S3
+        s3 = boto3.client('s3')
+        bucket = "creator-insight-dvc-bucket"
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        key = f"retraining_data/{timestamp}_{video_id}.json"
+        
+        s3.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=json.dumps(save_data, indent=2),
+            ContentType='application/json'
+        )
+        
+        print(f"Saved {len(predictions)} predictions to S3: {key}")
+        
+        return jsonify({
+            "status": "success",
+            "count": len(predictions),
+            "s3_key": key,
+            "avg_confidence": save_data["metadata"]["avg_confidence"]
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Save to S3 failed: {e}")
+        return jsonify({"error": f"Save failed: {str(e)}"}), 500
+    
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

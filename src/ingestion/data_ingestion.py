@@ -90,25 +90,51 @@ def save_data(train_data: pd.DataFrame, test_data: pd.DataFrame, data_path: str)
 
 def main():
     try:
-        # Load parameters from the params.yaml in the root directory
+        # Load parameters
         params = load_params(params_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../params.yaml'))
         test_size = params['data_ingestion']['test_size']
         
-        # Load data from the specified URL
+        # Define paths
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        train_path = os.path.join(root_dir, '../../data/interim/train.csv')
+        test_path = os.path.join(root_dir, '../../data/interim/test.csv')
+        
+        # ========================================
+        # SMART DETECTION: Check if merged data exists
+        # ========================================
+        if os.path.exists(train_path) and os.path.exists(test_path):
+            # Retraining mode - merged data exists, use it
+            logger.debug('✅ Found existing train/test data - using for retraining')
+            print('ℹ️  RETRAINING MODE: Using existing merged data')
+            print(f'   📁 Train: {os.path.getsize(train_path) / 1024 / 1024:.1f}MB')
+            print(f'   📁 Test: {os.path.getsize(test_path) / 1024 / 1024:.1f}MB')
+            return  # Exit early - don't download/overwrite
+        
+        # ========================================
+        # NORMAL MODE: Download fresh data
+        # ========================================
+        logger.debug('⬇️  No existing data - downloading from GitHub')
+        print('📥 NORMAL MODE: Downloading fresh data from GitHub...')
+        
+        # Load data from GitHub
         df = load_data(data_url='https://raw.githubusercontent.com/saurabhchavan7/CreatorInsight-AI-Platform-End-to-End-MLOps-System-for-Comment-Intelligence-and-Summarization/refs/heads/main/data/raw/reddit.csv')
         
-        # Preprocess the data
+        # Preprocess
         final_df = preprocess_data(df)
         
-        # Split the data into training and testing sets
+        # Split
         train_data, test_data = train_test_split(final_df, test_size=test_size, random_state=42)
         
-        # Save the split datasets and create the raw folder if it doesn't exist
-        save_data(train_data, test_data, data_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data'))
+        # Save
+        save_data(train_data, test_data, data_path=os.path.join(root_dir, '../../data'))
+        
+        logger.debug('✅ Fresh data downloaded, split, and saved')
+        print('✅ Data ingestion complete')
         
     except Exception as e:
         logger.error('Failed to complete the data ingestion process: %s', e)
         print(f"Error: {e}")
+
 
 if __name__ == '__main__':
     main()

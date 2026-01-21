@@ -18,6 +18,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const btnAnalyze = document.getElementById("btnAnalyze");
   const btnExportHTML = document.getElementById("btnExportHTML");
 
+     // ===== DEVELOPER MENU ===== 
+  const devMenuBtn = document.getElementById("devMenuBtn");
+  const devMenuDropdown = document.getElementById("devMenuDropdown");
+  const btnSaveData = document.getElementById("btnSaveData");
+
   const mTotal = document.getElementById("mTotal");
   const mUnique = document.getElementById("mUnique");
   const mAvgLen = document.getElementById("mAvgLen");
@@ -42,6 +47,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Theme toggle
   const themeToggle = document.getElementById("themeToggle");
+
+ 
 
   // Modal
   const imgModal = document.getElementById("imgModal");
@@ -303,6 +310,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+        // ===== DEVELOPER MENU =====
+    if (devMenuBtn && devMenuDropdown) {
+      devMenuBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        devMenuDropdown.classList.toggle("open");
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!devMenuDropdown.contains(e.target) && !devMenuBtn.contains(e.target)) {
+          devMenuDropdown.classList.remove("open");
+        }
+      });
+    }
+
+
+
 
   // ===== TABS =====
   tabButtons.forEach(btn => {
@@ -483,6 +506,44 @@ document.addEventListener("DOMContentLoaded", async () => {
     setStatus("ok", "Analysis complete. Explore tabs or export report.");
   });
 
+// ===== SAVE FOR RETRAINING ===== (KEEP ONLY THIS ONE)
+  btnSaveData.addEventListener("click", async () => {
+    if (!ensureAnalyzed()) return;
+    
+    devMenuDropdown.classList.remove("open");
+    setStatus("idle", "Saving data for retraining...");
+    
+    try {
+      const predictionsWithConfidence = predictions.map(p => ({
+        comment: p.comment,
+        sentiment: p.sentiment,
+        confidence: p.confidence || null,
+        timestamp: p.timestamp || new Date().toISOString()
+      }));
+      
+      const response = await fetch(`${API_URL}/save_for_retraining`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_id: currentVideoId,
+          predictions: predictionsWithConfidence
+        })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        setStatus("ok", ` Saved ${result.count} predictions (conf: ${(result.avg_confidence * 100).toFixed(1)}%)`);
+      } else {
+        setStatus("warn", "Failed to save data");
+      }
+    } catch (error) {
+      console.error("Save failed:", error);
+      setStatus("warn", "Save failed. Check backend.");
+    }
+  });
+
+  
+
   // ===== EXPORT HTML ONLY =====
   btnExportHTML.addEventListener("click", () => {
     if (!ensureAnalyzed()) return;
@@ -499,6 +560,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Cleanup later
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   });
+
 
 
   function buildExportPayload() {
@@ -813,4 +875,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       return null;
     }
   }
+      // TEST - Remove after debugging
+    console.log("Script loaded!");
+    console.log("Dev menu button:", document.getElementById("devMenuBtn"));
+    console.log("Dev menu dropdown:", document.getElementById("devMenuDropdown"));
 });
+
+

@@ -28,6 +28,11 @@ def test_predict_endpoint():
     for item in data:
         assert "comment" in item
         assert "sentiment" in item
+        assert "confidence" in item  # NEW CHECK
+        
+        # Validate confidence is a number between 0 and 1
+        conf = item["confidence"]
+        assert conf is None or (0.0 <= conf <= 1.0)
 
 
 def test_predict_with_timestamps_endpoint():

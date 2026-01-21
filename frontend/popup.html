@@ -1,6 +1,5 @@
 <!-- Load config first -->
 <script src="config.js"></script>
-<script src="popup.js"></script>
 
 <!DOCTYPE html>
 <html>
@@ -539,7 +538,75 @@
       border-color: rgba(79,70,229,0.28);
     }
 
+    /* Developer Menu (3-dot) */
+    .devMenu {
+      position: relative;
+    }
 
+    .devMenuBtn {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid var(--border);
+      background: var(--btnBg);
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 120ms ease;
+    }
+
+    .devMenuBtn:hover {
+      background: var(--btnHover);
+      color: var(--accent);
+    }
+
+    .devMenuDropdown {
+      position: absolute;
+      top: 38px;
+      right: 0;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 6px;
+      min-width: 180px;
+      display: none;
+      z-index: 1000;
+    }
+
+    .devMenuDropdown.open {
+      display: block;
+    }
+
+    .devMenuDropdown button {
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+
+    .devMenuDropdown button:last-child {
+      margin-bottom: 0;
+    }
+
+    .devMenuDropdown button:hover {
+      background: var(--accentSoft);
+      border-color: rgba(79,70,229,0.22);
+      color: var(--accent);
+    }
   </style>
 </head>
 
@@ -552,6 +619,15 @@
       </div>
       <div style="display:flex; gap:8px; align-items:center;">
         <div class="pill" id="pageStatus">Ready</div>
+        
+        <!-- Developer Menu (3-dot) -->
+        <div class="devMenu">
+          <button class="devMenuBtn" id="devMenuBtn">⋮</button>
+          <div class="devMenuDropdown" id="devMenuDropdown">
+            <button id="btnSaveData">💾 Save for Retraining</button>
+          </div>
+        </div>
+        
         <div class="themeSwitch">
         <span class="icon">☀️</span>
         <label class="switch">

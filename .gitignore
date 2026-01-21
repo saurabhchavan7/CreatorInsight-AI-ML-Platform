@@ -23,6 +23,90 @@ __pycache__/
 .Python
 EOF
 
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ========================================
+# DVC-tracked folders (DON'T commit to git)
+# ========================================
+/data/interim
+/data/processed
+/data/retraining
+
+# ========================================
+# Model files (DVC-tracked)
+# ========================================
+/models/*.pkl
+
+# ========================================
+# Temporary retraining files
+# ========================================
+data/new_training_samples.csv
+data/retraining/new_samples.csv
+data/interim/train_backup.csv
+*.backup
+*_backup.csv
+
+# ========================================
+# MLflow & Experiment tracking
+# ========================================
+experiment_info.json
+mlruns/
+
+# ========================================
+# Log files
+# ========================================
+*.log
+errors.log
+model_building_errors.log
+model_evaluation_errors.log
+model_registration_errors.log
+flask.log
+
+# ========================================
+# Generated artifacts
+# ========================================
+confusion_matrix_*.png
+classification_report.json
+
+# ========================================
+# Environment & Config files
+# ========================================
+.env
+backend/flask_app/config.py
+frontend/config.js
+
+# ========================================
+# Retraining metadata
+# ========================================
+data/retraining_history.json
+
+# ========================================
+# Requirements variants
+# ========================================
 requirements_v2.txt
 
-frontend/config.js
+# ========================================
+# OS files
+# ========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================================
+# IDE
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
