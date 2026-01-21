@@ -1,5 +1,5 @@
 # scripts/config.py
 # Centralized MLflow configuration - UPDATE URL HERE ONLY
 
-MLFLOW_TRACKING_URI = "http://ec2-34-203-14-116.compute-1.amazonaws.com:5000/"
+MLFLOW_TRACKING_URI = "http://ec2-34-236-144-23.compute-1.amazonaws.com:5000/"
 MODEL_NAME = "creatorinsight_sentiment_pipeline"
