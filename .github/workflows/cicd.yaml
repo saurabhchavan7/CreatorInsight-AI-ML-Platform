@@ -105,18 +105,37 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
+          MLFLOW_TRACKING_URI: "http://ec2-34-203-14-116.compute-1.amazonaws.com:5000/"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          nohup python backend/flask_app/app.py &
-          sleep 10
-
-      - name: Wait for Flask to be ready
-        run: |
+          # Start Flask with logging
+          python backend/flask_app/app.py > flask.log 2>&1 &
+          FLASK_PID=$!
+          
+          # Wait for startup (model loading takes time)
+          echo "Waiting for Flask to start..."
+          sleep 20
+          
+          # Verify Flask is running
+          if ! kill -0 $FLASK_PID 2>/dev/null; then
+            echo "❌ Flask crashed!"
+            cat flask.log
+            exit 1
+          fi
+          
+          # Test if Flask is responding
           for i in {1..10}; do
-            curl -f http://localhost:5000/ && break
+            if curl -f http://localhost:5000/ 2>/dev/null; then
+              echo "✅ Flask is responding"
+              break
+            fi
             sleep 2
           done
-  
+          
+          # Show logs
+          echo "=== Flask Logs ==="
+          cat flask.log
+
       - name: Run Flask API tests
         run: |
           pytest scripts/test_flask_api.py
