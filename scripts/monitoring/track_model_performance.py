@@ -10,7 +10,7 @@ import mlflow
 import pandas as pd
 from datetime import datetime
 
-DEFAULT_MLFLOW_TRACKING_URI = "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+DEFAULT_MLFLOW_TRACKING_URI = "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", DEFAULT_MLFLOW_TRACKING_URI)
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 

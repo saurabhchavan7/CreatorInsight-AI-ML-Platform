@@ -142,7 +142,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           if [ "${{ steps.detect_mode.outputs.mode }}" = "retrain" ]; then
             echo "Running DVC pipeline with merged training data (retraining mode)..."
@@ -184,7 +184,7 @@ jobs:
       - name: Model Performance Snapshot (MLflow)
         continue-on-error: true
         env:
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           python scripts/monitoring/track_model_performance.py
 
@@ -258,7 +258,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           echo "Validating model can be loaded from MLflow Registry..."
           pytest scripts/test_load_model.py -v
@@ -267,7 +267,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           echo "Validating model input/output signature..."
           pytest scripts/test_model_signature.py -v
@@ -276,7 +276,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           echo "Validating model meets minimum performance requirements..."
           pytest scripts/test_model_performance.py -v
@@ -290,7 +290,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           echo "Comparing newly trained model against current production model..."
           python scripts/compare_models.py > comparison.txt
@@ -301,7 +301,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
         run: |
           echo "Promoting validated model to production stage..."
           python scripts/promote_model.py
@@ -315,7 +315,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-1
-          MLFLOW_TRACKING_URI: "http://ec2-3-91-67-139.compute-1.amazonaws.com:5000/"
+          MLFLOW_TRACKING_URI: "http://ec2-52-73-142-244.compute-1.amazonaws.com:5000/"
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           echo "Starting Flask API server for testing..."
