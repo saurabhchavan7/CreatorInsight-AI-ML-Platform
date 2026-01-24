@@ -1,6 +1,19 @@
 # CreatorInsight AI Platform
 
-End-to-End MLOps System for YouTube Comment Intelligence with Automated Retraining
+## Table of Contents
+
+1. [System Architecture](#system-architecture)
+2. [Demo Videos](#demo-videos)
+3. [Overview](#overview)
+4. [Business Problem](#business-problem)
+5. [Solution](#solution)
+6. [Technology Stack](#technology-stack)
+7. [Project Development Journey](#project-development-journey)
+8. [MLOps Implementation](#mlops-implementation)
+9. [Deployment Architecture](#deployment-architecture)
+10. [Results and Performance](#results-and-performance)
+11. [Key Learnings](#key-learnings)
+12. [Project Structure](#project-structure)
 
 [![MLOps](https://img.shields.io/badge/MLOps-End--to--End-blue)]() [![AWS](https://img.shields.io/badge/AWS-Cloud--Native-orange)]() [![Python](https://img.shields.io/badge/Python-3.10-green)]() [![CI/CD](https://img.shields.io/badge/CI%2FCD-Automated-yellow)]()
 
@@ -8,7 +21,7 @@ End-to-End MLOps System for YouTube Comment Intelligence with Automated Retraini
 
 ## System Architecture
 
-![CreatorInsight AI Platform - Project Architecture](./architecture/project-architecture.png)
+![CreatorInsight AI Platform - Project Architecture](./architecture/project-architecture.gif)
 
 The architecture diagram illustrates the complete end-to-end MLOps workflow including data sources, DVC training pipeline, MLflow model registry, AWS infrastructure, CI/CD automation, monitoring systems, and intelligent retraining loops.
 
@@ -18,7 +31,7 @@ The architecture diagram illustrates the complete end-to-end MLOps workflow incl
 
 ### 1. Chrome Extension and System Demo
 
-![Chrome Extension Demo](./images/gifs/chrome-extension-demo.gif)
+![Chrome Extension Demo](./architecture/chrome-extension-demo.gif)
 
 **Video on youtube:** [CreatorInsight Chrome Extension Demo](https://youtu.be/bGiwzIXikxc)
 
@@ -28,7 +41,7 @@ Demonstrates real-time sentiment analysis, AI-powered summaries, visual analytic
 
 ### 2. MLflow Experiment Tracking and Model Registry
 
-![MLflow Tracking Demo](./images/gifs/mlflow-tracking-demo.gif)
+![MLflow Tracking Demo](./architecture/mlflow-tracking-demo.gif)
 
 **Video on youtube:** [CreatorInsight MLflow Integration](https://youtu.be/D66FyJL1_HQ)
 
@@ -38,40 +51,11 @@ Shows systematic experimentation phase, hyperparameter tuning with Optuna, model
 
 ### 3. CI/CD Pipeline and AWS Deployment
 
-![CI/CD Pipeline Demo](./images/gifs/cicd-deployment-demo.gif)
+![CI/CD Pipeline Demo](./architecture/cicd-deployment-demo.gif)
 
 **Video on youtube:** [CreatorInsight CI/CD and Deployment](https://youtu.be/8JC2IMO7FgI)
 
 Demonstrates automated GitHub Actions workflow with retraining detection, testing gates, Docker build, and AWS CodeDeploy rolling deployment to Auto Scaling Group.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Business Problem](#business-problem)
-3. [Solution](#solution)
-4. [Technology Stack](#technology-stack)
-5. [Project Development Journey](#project-development-journey)
-6. [MLOps Implementation](#mlops-implementation)
-7. [Deployment Architecture](#deployment-architecture)
-8. [Results and Performance](#results-and-performance)
-9. [Key Learnings](#key-learnings)
-10. [Project Structure](#project-structure)
-
----
-
-## Overview
-
-CreatorInsight is a complete MLOps platform providing real-time sentiment analysis and AI-powered insights for YouTube video comments. The system demonstrates professional machine learning engineering practices including automated training pipelines, model registry, continuous integration and deployment, monitoring, and intelligent retraining.
-
-**What It Does**
-
-YouTube creators receive thousands of comments but lack tools to analyze them systematically. CreatorInsight automatically classifies comment sentiment, generates AI summaries identifying key themes and actionable feedback, and provides visual analytics for data-driven content decisions.
-
-**Technical Scope**
-
-This project implements the complete ML lifecycle: data versioning, automated training pipelines, experiment tracking, model registry, containerized deployment, CI/CD automation, production monitoring, drift detection, and automated retraining with enterprise data selection strategies.
 
 ---
 
@@ -81,11 +65,21 @@ Large YouTube channels receive thousands of comments per video. Manual analysis 
 
 ---
 
+## Overview
+
+CreatorInsight is a complete MLOps platform providing real-time sentiment analysis and AI-powered insights for YouTube video comments. The system demonstrates professional machine learning engineering practices including automated training pipelines, model registry, continuous integration and deployment, monitoring, and intelligent retraining.
+
+**Technical Scope**
+
+This project implements the complete ML lifecycle: data versioning, automated training pipelines, experiment tracking, model registry, containerized deployment, CI/CD automation, production monitoring, drift detection, and automated retraining with enterprise data selection strategies.
+
+---
+
 ## Solution
 
 **Chrome Browser Extension**
 
-Users install the extension and analyze any YouTube video with one click. The system fetches up to 500 comments, classifies sentiment in real-time, generates AI summaries, and displays visual analytics including distribution charts, word clouds, and trend graphs.
+Users install the extension and analyze any YouTube video with one click. The system fetches up to 500  (currently restricted to 500), classifies sentiment in real-time, generates AI summaries, and displays visual analytics including distribution charts, word clouds, and trend graphs.
 
 **Core Features**
 
@@ -173,7 +167,7 @@ Initialized DVC in project repository and configured S3 remote storage. Set up A
 
 **Dataset Selection**
 
-Identified publicly available Reddit sentiment dataset on Kaggle containing 40,000+ labeled comments across three classes (Positive, Neutral, Negative). Downloaded and uploaded to GitHub repository for pipeline access.
+Identified publicly available comment sentiment dataset on Kaggle containing 40,000+ labeled comments across three classes (Positive, Neutral, Negative). Downloaded and uploaded to GitHub repository for pipeline access.
 
 **Exploratory Data Analysis**
 
@@ -263,13 +257,13 @@ Used Optuna with Bayesian optimization to tune LightGBM. Conducted 50 trials exp
 Optuna analysis revealed learning rate accounts for 91% of performance variance. Other parameters had minimal impact. This guided focused optimization on learning rate while keeping other parameters at reasonable defaults.
 
 **Final Configuration:**
-- learning_rate: 0.09
+- learning_rate: 0.04
 - max_depth: 20
 - n_estimators: 367
 - F1 score: 0.88
 - Accuracy: 86%
 
-**What We Learned**
+**Learnings**
 
 Starting with simple baseline revealed class imbalance as core problem. Systematic testing showed TF-IDF trigrams superior to embeddings for this task. LightGBM outperformed both tree-based and linear models. Hyperparameter importance analysis prevented wasted optimization effort on low-impact parameters.
 
@@ -407,7 +401,7 @@ Extended Flask API with save endpoint allowing users to store predictions to S3.
 
 **Enterprise Selection Strategy**
 
-Implemented three-tier selection algorithm inspired by active learning research. Rather than using all production predictions, intelligently selects 100 best examples from 1,000+ predictions:
+Implemented three-tier selection algorithm inspired by active learning research. Rather than using all production predictions, intelligently selects 100 best examples from each pool of 1,000 predictions:
 
 - Tier 1 (30 samples): Hard negative mining - selects predictions with confidence 0.4-0.65 where model was most uncertain
 - Tier 2 (50 samples): Stratified sampling - balances across sentiment classes from high-confidence predictions
@@ -559,17 +553,6 @@ Script queries MLflow registry retrieving all model versions with metrics. Gener
 | Model Confidence (Average) | 78-85% |
 | System Uptime | 99.5%+ |
 
-### Infrastructure Cost
-
-| Component | Monthly Cost |
-|-----------|--------------|
-| EC2 (MLflow server) | $3 |
-| EC2 (API instances, 2x) | $6-8 |
-| S3 Storage | $1-2 |
-| CloudWatch | $1 |
-| ECR | $0.50 |
-| Total | $12-15 |
-
 ---
 
 ## Key Learnings
@@ -610,26 +593,6 @@ Script queries MLflow registry retrieving all model versions with metrics. Gener
 - CloudWatch selected over Prometheus/Grafana for AWS integration and zero infrastructure overhead
 - Custom drift detection implemented versus third-party tools for learning and customization
 - Balanced monitoring depth against operational complexity
-
----
-
-## What Makes This Project Different
-
-**Complete MLOps Lifecycle**
-
-Most portfolio projects demonstrate model training and basic deployment. This project implements the full production lifecycle including version control, automated pipelines, testing, monitoring, drift detection, and retraining. Every component designed for actual production operation, not just demonstration.
-
-**Real-World Problem Solving**
-
-Encountered and solved authentic production ML challenges: class imbalance causing minority class failure, data leakage inflating metrics, training-serving skew from separate artifacts, drift from distribution changes. Solutions follow industry practices used at scale.
-
-**Enterprise Patterns**
-
-Implements patterns used by technology companies: staged model promotion with validation gates, enterprise data selection for efficient retraining, monitoring with automated alerting, zero-downtime deployments, infrastructure as code.
-
-**End-to-End Automation**
-
-Single git push triggers complete workflow: data versioning, pipeline execution, experiment tracking, testing, containerization, deployment, monitoring. No manual steps required in deployment path.
 
 ---
 
@@ -682,62 +645,6 @@ CreatorInsight-AI-Platform/
 
 ---
 
-## Setup and Installation
-
-**Prerequisites**
-- Python 3.10 or higher
-- AWS account with configured credentials
-- Docker installed locally
-- Git and DVC installed
-
-**Local Development**
-
-```bash
-git clone https://github.com/saurabhchavan7/CreatorInsight-AI-Platform.git
-cd CreatorInsight-AI-Platform
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-dvc pull
-```
-
-**Running Pipeline Locally**
-
-```bash
-dvc repro
-```
-
-**Starting Flask API**
-
-```bash
-python backend/flask_app/app.py
-```
-
-**Installing Chrome Extension**
-
-Navigate to chrome://extensions, enable Developer mode, click Load unpacked, select frontend directory.
-
----
-
-## Technical Highlights
-
-### Model Signature Validation
-
-Implemented automatic input/output schema validation preventing production errors. Signature inferred during training and enforced during model loading. Catches common failures like shape mismatches or type incompatibilities before affecting users.
-
-### Training-Serving Consistency
-
-Single pipeline artifact contains both TF-IDF vectorizer and LightGBM model. Eliminates possibility of deploying mismatched versions. API predicts on raw text with pipeline handling feature engineering identically to training.
-
-### Intelligent Retraining
-
-Production predictions saved with confidence scores and metadata. Enterprise selection algorithm maximizes learning value per sample. Hard negative mining focuses on uncertain predictions where model can improve most. Stratified and diversity sampling ensure balanced, generalizable improvements.
-
-### Zero-Downtime Deployment
-
-CodeDeploy rolling update strategy updates one instance at a time. Load balancer continues routing traffic to healthy instances during deployment. Failed deployments automatically roll back. Health checks validate application functionality before marking deployment successful.
-
----
 
 ## Future Enhancements
 
@@ -751,22 +658,7 @@ CodeDeploy rolling update strategy updates one instance at a time. Load balancer
 **Product Features**
 - Multi-language support with translation preprocessing
 - Historical trend analysis across creator video catalog
-- Competitor benchmarking capabilities
 - Sarcasm and irony detection models
-- Integration with YouTube Creator Studio API
+
 
 ---
-
-## Contact
-
-**Developer:** Saurabh Chavan
-
-**Repository:** github.com/saurabhchavan7/CreatorInsight-AI-Platform
-
-**Project Type:** MLOps Portfolio Demonstration
-
-**Date:** January 2025
-
----
-
-This project demonstrates production-ready MLOps implementation suitable for enterprise deployment. Architecture, testing strategies, and automation workflows follow industry standards while optimized for portfolio presentation and learning objectives.
