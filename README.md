@@ -21,7 +21,7 @@
 
 ## System Architecture
 
-![CreatorInsight AI Platform - Project Architecture](./architecture/project-architecture.gif)
+![CreatorInsight AI Platform - Project Architecture](./architecture/project-architecture.svg)
 
 The architecture diagram illustrates the complete end-to-end MLOps workflow including data sources, DVC training pipeline, MLflow model registry, AWS infrastructure, CI/CD automation, monitoring systems, and intelligent retraining loops.
 
